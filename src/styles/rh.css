@@ -5,7 +5,10 @@
 .app-shell {
   width: 100%;
   min-height: 100vh;
-  background: var(--bg-light);
+  background:
+    linear-gradient(180deg, rgba(244, 247, 251, 0.66), rgba(244, 247, 251, 0.74)),
+    url("/images/rh-background.jpg") center / cover no-repeat fixed,
+    var(--bg-light);
 }
 
 .app-shell {
@@ -224,7 +227,9 @@
 }
 
 .topbar {
-  background: #dfe3e7;
+  background:
+    linear-gradient(90deg, rgba(223, 227, 231, 0.72), rgba(223, 227, 231, 0.58)),
+    url("/images/rh-background.jpg") center top / cover no-repeat;
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 

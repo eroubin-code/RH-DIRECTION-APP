@@ -1,12 +1,13 @@
 import crypto from "node:crypto";
 import express from "express";
-import { rhData } from "./data/rhData.js";
+import { appConfig } from "./config.js";
+import { getDataStatus, getRhDataset } from "./data/index.js";
 import { users } from "./data/users.js";
 
 const app = express();
-const port = Number(process.env.PORT ?? 3001);
+const port = appConfig.port;
 const sessions = new Map();
-const PASSWORD_SALT = "rh-direction-salt";
+const PASSWORD_SALT = appConfig.auth.salt;
 
 function hashPassword(password) {
   return crypto.scryptSync(password, PASSWORD_SALT, 64).toString("hex");
@@ -39,8 +40,13 @@ function requireAuth(request, response, next) {
 
 app.use(express.json());
 
-app.get("/api/health", (_request, response) => {
-  response.json({ status: "ok" });
+app.get("/api/health", async (_request, response) => {
+  const dataStatus = await getDataStatus();
+
+  response.json({
+    status: "ok",
+    dataSource: dataStatus
+  });
 });
 
 app.post("/api/auth/login", (request, response) => {
@@ -73,24 +79,49 @@ app.post("/api/auth/logout", requireAuth, (request, response) => {
   response.status(204).end();
 });
 
-app.get("/api/dashboard", requireAuth, (_request, response) => {
-  response.json(rhData.dashboard);
+app.get("/api/dashboard", requireAuth, async (_request, response) => {
+  try {
+    const dataset = await getRhDataset();
+    response.json(dataset.dashboard);
+  } catch (error) {
+    response.status(500).json({ message: error.message });
+  }
 });
 
-app.get("/api/effectif", requireAuth, (_request, response) => {
-  response.json(rhData.effectif);
+app.get("/api/effectif", requireAuth, async (_request, response) => {
+  try {
+    const dataset = await getRhDataset();
+    response.json(dataset.effectif);
+  } catch (error) {
+    response.status(500).json({ message: error.message });
+  }
 });
 
-app.get("/api/departs", requireAuth, (_request, response) => {
-  response.json(rhData.departs);
+app.get("/api/departs", requireAuth, async (_request, response) => {
+  try {
+    const dataset = await getRhDataset();
+    response.json(dataset.departs);
+  } catch (error) {
+    response.status(500).json({ message: error.message });
+  }
 });
 
-app.get("/api/badges", requireAuth, (_request, response) => {
-  response.json(rhData.badges);
+app.get("/api/badges", requireAuth, async (_request, response) => {
+  try {
+    const dataset = await getRhDataset();
+    response.json(dataset.badges);
+  } catch (error) {
+    response.status(500).json({ message: error.message });
+  }
 });
 
-app.get("/api/entites", requireAuth, (_request, response) => {
-  response.json(rhData.entites);
+app.get("/api/entites", requireAuth, async (_request, response) => {
+  try {
+    const dataset = await getRhDataset();
+    response.json(dataset.entites);
+  } catch (error) {
+    response.status(500).json({ message: error.message });
+  }
 });
 
 app.listen(port, () => {

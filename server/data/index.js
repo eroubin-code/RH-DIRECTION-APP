@@ -1,0 +1,214 @@
+import { appConfig } from "../config.js";
+import { rhData } from "./rhData.js";
+
+let mysqlPromiseModule = null;
+let pool = null;
+
+function normalizeRows(rows) {
+  return rows.map((row) =>
+    Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [key, value ?? ""])
+    )
+  );
+}
+
+async function loadMysqlModule() {
+  if (!mysqlPromiseModule) {
+    mysqlPromiseModule = import("mysql2/promise");
+  }
+
+  return mysqlPromiseModule;
+}
+
+async function getPool() {
+  if (pool) {
+    return pool;
+  }
+
+  const mysql = await loadMysqlModule();
+  pool = mysql.createPool(appConfig.dataSource.mysql);
+  return pool;
+}
+
+function buildTableReference(viewName) {
+  return `\`${viewName.replaceAll("`", "")}\``;
+}
+
+async function queryRows(sql) {
+  const currentPool = await getPool();
+  const [rows] = await currentPool.query(sql);
+  return normalizeRows(rows);
+}
+
+async function readMysqlEffectif() {
+  const rows = await queryRows(
+    [
+      "SELECT",
+      "  nom,",
+      "  prenom,",
+      "  '' AS categorie,",
+      "  '' AS fonction,",
+      "  equipe AS entite,",
+      "  '' AS badge,",
+      "  '' AS statut_badge,",
+      "  titre AS civilite",
+      `FROM ${buildTableReference(appConfig.views.effectif)}`,
+      "ORDER BY nom, prenom"
+    ].join(" ")
+  );
+
+  return rows;
+}
+
+async function readMysqlDeparts() {
+  const rows = await queryRows(
+    [
+      "SELECT",
+      "  nom,",
+      "  prenom,",
+      "  depart,",
+      "  entite,",
+      "  badge,",
+      "  CASE",
+      "    WHEN depart IS NULL THEN 'A completer'",
+      "    WHEN depart < CURDATE() THEN 'Verifier restitution badge'",
+      "    ELSE 'Preparer sortie et desactivation badge'",
+      "  END AS action_recommandee",
+      `FROM ${buildTableReference(appConfig.views.departs)}`,
+      "WHERE depart BETWEEN CURDATE() - INTERVAL 30 DAY AND CURDATE() + INTERVAL 30 DAY",
+      "ORDER BY depart ASC, nom ASC"
+    ].join(" ")
+  );
+
+  return rows;
+}
+
+async function readMysqlBadges() {
+  const rows = await queryRows(
+    [
+      "SELECT",
+      "  nom,",
+      "  prenom,",
+      "  badge,",
+      "  'Oui' AS interne,",
+      "  'Badge acces' AS type_carte,",
+      "  CASE",
+      "    WHEN badge IS NULL OR badge = '' THEN 'Sans badge'",
+      "    WHEN depart IS NOT NULL AND depart <= CURDATE() THEN 'A desactiver'",
+      "    WHEN depart IS NOT NULL THEN 'A restituer'",
+      "    ELSE 'Actif'",
+      "  END AS statut",
+      `FROM ${buildTableReference(appConfig.views.departs)}`,
+      "ORDER BY nom, prenom"
+    ].join(" ")
+  );
+
+  return rows;
+}
+
+async function readMysqlEntites() {
+  const rows = await queryRows(
+    [
+      "SELECT",
+      "  equipe AS entite,",
+      "  '' AS responsable,",
+      "  COUNT(*) AS effectif",
+      `FROM ${buildTableReference(appConfig.views.effectif)}`,
+      "GROUP BY equipe",
+      "ORDER BY effectif DESC, entite ASC"
+    ].join(" ")
+  );
+
+  return rows;
+}
+
+function computeDashboard({ effectif, departs, badges, entites }) {
+  const recentDeparts = [...departs]
+    .sort((left, right) => String(left.depart).localeCompare(String(right.depart)))
+    .slice(0, 5)
+    .map((row, index) => ({
+      id: row.id ?? `depart-${index}`,
+      nom: row.nom,
+      prenom: row.prenom,
+      date: row.depart,
+      entite: row.entite
+    }));
+
+  const activeBadgesCount = badges.filter((row) =>
+    String(row.statut).toLowerCase().includes("actif")
+  ).length;
+
+  return {
+    kpis: [
+      { label: "Effectif total", value: effectif.length },
+      { label: "Departs a suivre", value: departs.length },
+      { label: "Badges actifs", value: activeBadgesCount },
+      { label: "Entites suivies", value: entites.length }
+    ],
+    recentDeparts
+  };
+}
+
+export async function getRhDataset() {
+  const mode = appConfig.dataSource.mode.toLowerCase();
+
+  if (mode !== "mysql") {
+    return {
+      source: "mock",
+      dashboard: rhData.dashboard,
+      effectif: rhData.effectif,
+      departs: rhData.departs,
+      badges: rhData.badges,
+      entites: rhData.entites
+    };
+  }
+
+  const [effectif, departs, badges, entites] = await Promise.all([
+    readMysqlEffectif(),
+    readMysqlDeparts(),
+    readMysqlBadges(),
+    readMysqlEntites()
+  ]);
+
+  return {
+    source: "mysql",
+    dashboard: computeDashboard({ effectif, departs, badges, entites }),
+    effectif,
+    departs,
+    badges,
+    entites
+  };
+}
+
+export async function getDataStatus() {
+  const mode = appConfig.dataSource.mode.toLowerCase();
+
+  if (mode !== "mysql") {
+    return {
+      mode: "mock",
+      connected: false
+    };
+  }
+
+  try {
+    const currentPool = await getPool();
+    await currentPool.query("SELECT 1");
+
+    return {
+      mode: "mysql",
+      connected: true,
+      database: appConfig.dataSource.mysql.database,
+      host: appConfig.dataSource.mysql.host,
+      views: appConfig.views
+    };
+  } catch (error) {
+    return {
+      mode: "mysql",
+      connected: false,
+      database: appConfig.dataSource.mysql.database,
+      host: appConfig.dataSource.mysql.host,
+      views: appConfig.views,
+      error: error.message
+    };
+  }
+}

@@ -1,0 +1,49 @@
+/* =========================
+   RESET / BASE
+========================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f3f3f3;
+  color: #1f2937;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul {
+  list-style: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* =========================
+   VARIABLES
+========================= */
+:root {
+  --bg-light: #f1f3f5;
+  --bg-white: #ffffff;
+  --text-dark: #1f2937;
+  --text-muted: #6b7280;
+  --primary: #1f4f7a;
+  --primary-dark: #143752;
+  --border-light: #e5e7eb;
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 10px 22px rgba(0, 0, 0, 0.1);
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --container: 1280px;
+}

@@ -143,6 +143,40 @@
   flex-shrink: 0;
 }
 
+.brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.brand-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #fff;
+  padding: 6px;
+}
+
+.brand-logo-fallback {
+  display: none;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.brand-logo[data-fallback="true"] .brand-logo-fallback {
+  display: inline-flex;
+}
+
 .sidebar-brand h1 {
   font-size: 18px;
   color: var(--text-dark);

@@ -1,4 +1,6 @@
 // En-tete commun qui resume l'application et propose des actions globales.
+import BrandLogo from "./BrandLogo";
+
 export default function Header({ currentUser, onLogout }) {
   return (
     <header className="page-header">
@@ -25,7 +27,7 @@ export default function Header({ currentUser, onLogout }) {
       <div className="main-header">
         <div className="main-header-inner">
           <div className="logo-zone">
-            <div className="sidebar-logo">RH</div>
+            <BrandLogo alt="Logo IECB - entete" />
             <div className="logo-text">
               <p className="title">Tableau de bord RH</p>
               <p className="subtitle">

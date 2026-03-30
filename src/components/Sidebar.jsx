@@ -1,5 +1,6 @@
 // Composant de menu lateral pour naviguer entre les pages RH.
 import { NavLink } from "react-router-dom";
+import BrandLogo from "./BrandLogo";
 
 const links = [
   { to: "/dashboard", label: "Dashboard" },
@@ -13,7 +14,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-logo">RH</div>
+        <BrandLogo alt="Logo IECB - navigation" />
         <div>
           <h1>RH Direction</h1>
           <p>IECB</p>

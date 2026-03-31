@@ -7,7 +7,7 @@ export default function Header({ currentUser, onLogout }) {
       <div className="topbar">
         <div className="topbar-inner">
           <div className="topbar-left">
-            <span className="header-user">{`Connect\u00e9 : ${currentUser}`}</span>
+            <span className="header-user">{`Connecté : ${currentUser}`}</span>
           </div>
 
           <div className="topbar-right header-actions">
@@ -18,7 +18,7 @@ export default function Header({ currentUser, onLogout }) {
               Actualiser
             </button>
             <button className="header-button" onClick={onLogout} type="button">
-              {`D\u00e9connexion`}
+              Déconnexion
             </button>
           </div>
         </div>
@@ -31,7 +31,7 @@ export default function Header({ currentUser, onLogout }) {
             <div className="logo-text">
               <p className="title">Tableau de bord RH</p>
               <p className="subtitle">
-                {`Suivi synth\u00e9tique des effectifs, d\u00e9parts, badges et entit\u00e9s.`}
+                Suivi synthétique des effectifs, départs, badges et entités.
               </p>
             </div>
           </div>

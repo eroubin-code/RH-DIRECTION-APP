@@ -5,9 +5,9 @@ import BrandLogo from "./BrandLogo";
 const links = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/effectif", label: "Effectif" },
-  { to: "/departs", label: "D\u00e9parts" },
-  { to: "/badges", label: "Badges" },
-  { to: "/entites", label: "Entit\u00e9s" }
+  { to: "/entites", label: "Entités" },
+  { to: "/departs", label: "Départs" },
+  { to: "/badges", label: "Badges" }
 ];
 
 export default function Sidebar() {

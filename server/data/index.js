@@ -44,16 +44,31 @@ async function readMysqlEffectif() {
   const rows = await queryRows(
     [
       "SELECT",
-      "  nom,",
-      "  prenom,",
+      "  p.id,",
+      "  p.nom,",
+      "  p.prenom,",
       "  '' AS categorie,",
-      "  '' AS fonction,",
-      "  equipe AS entite,",
+      "  COALESCE(p.fonction, '') AS fonction,",
+      "  COALESCE(",
+      "    GROUP_CONCAT(DISTINCT e.nom ORDER BY e.nom SEPARATOR ' | '),",
+      "    ''",
+      "  ) AS entite,",
       "  '' AS badge,",
       "  '' AS statut_badge,",
-      "  titre AS civilite",
-      `FROM ${buildTableReference(appConfig.views.effectif)}`,
-      "ORDER BY nom, prenom"
+      "  p.civilite AS civilite,",
+      "  p.depart AS date_depart",
+      "FROM personnes AS p",
+      "LEFT JOIN typesPersonnes AS tp ON tp.id = p.typesPersonne_id",
+      "LEFT JOIN personnes_entites AS pe ON pe.personne_id = p.id",
+      "LEFT JOIN entites AS e",
+      "  ON e.id = pe.entite_id",
+      "LEFT JOIN typesEntites AS te ON te.id = e.typesEntite_id",
+      "WHERE (p.depart IS NULL OR p.depart >= CURDATE())",
+      "  AND COALESCE(p.civilite, '') <> ''",
+      "  AND COALESCE(tp.nom, '') <> 'exterieur'",
+      "  AND (e.id IS NULL OR COALESCE(te.nom, '') <> 'exterieur')",
+      "GROUP BY p.id, p.nom, p.prenom, p.fonction, p.civilite",
+      "ORDER BY p.nom, p.prenom"
     ].join(" ")
   );
 
@@ -110,12 +125,22 @@ async function readMysqlEntites() {
   const rows = await queryRows(
     [
       "SELECT",
-      "  equipe AS entite,",
+      "  te.id AS type_entite_id,",
+      "  COALESCE(NULLIF(te.description, ''), te.nom) AS type_entite,",
+      "  e.nom AS entite,",
       "  '' AS responsable,",
-      "  COUNT(*) AS effectif",
-      `FROM ${buildTableReference(appConfig.views.effectif)}`,
-      "GROUP BY equipe",
-      "ORDER BY effectif DESC, entite ASC"
+      "  COUNT(DISTINCT p.id) AS effectif",
+      "FROM entites AS e",
+      "LEFT JOIN personnes_entites AS pe ON pe.entite_id = e.id",
+      "LEFT JOIN personnes AS p ON p.id = pe.personne_id",
+      "LEFT JOIN typesPersonnes AS tp ON tp.id = p.typesPersonne_id",
+      "LEFT JOIN typesEntites AS te ON te.id = e.typesEntite_id",
+      "WHERE (p.depart IS NULL OR p.depart >= CURDATE())",
+      "  AND COALESCE(tp.nom, '') <> 'exterieur'",
+      "  AND COALESCE(te.nom, '') <> 'exterieur'",
+      "GROUP BY e.id, e.nom, te.id, te.nom, te.description",
+      "HAVING COUNT(DISTINCT p.id) > 0",
+      "ORDER BY te.id ASC, e.nom ASC"
     ].join(" ")
   );
 

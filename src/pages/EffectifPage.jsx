@@ -1,7 +1,7 @@
 // Page qui liste l'effectif et les informations principales des collaborateurs.
 import { useEffect, useState } from "react";
 import DataTable from "../components/DataTable";
-import { getEffectif } from "../services/api";
+import { getEffectif, getEntites } from "../services/api";
 
 function toggleValueInList(values, targetValue) {
   return values.includes(targetValue)
@@ -57,6 +57,7 @@ function sortRows(rows, sortBy, order) {
 
 export default function EffectifPage() {
   const [rows, setRows] = useState([]);
+  const [entiteRows, setEntiteRows] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedEntites, setSelectedEntites] = useState([]);
   const [selectedFonctions, setSelectedFonctions] = useState([]);
@@ -66,6 +67,7 @@ export default function EffectifPage() {
 
   useEffect(() => {
     getEffectif().then(setRows);
+    getEntites().then(setEntiteRows);
   }, []);
 
   const columns = [
@@ -128,6 +130,41 @@ export default function EffectifPage() {
             const direction = sortOrder === "desc" ? -1 : 1;
             return left.label.localeCompare(right.label) * direction;
           });
+
+  const entiteTypeByName = entiteRows.reduce((accumulator, row) => {
+    accumulator[String(row.entite ?? "").trim()] = normalizeLabel(
+      row.type_entite,
+      "Type non renseigne"
+    );
+    return accumulator;
+  }, {});
+
+  const groupedEntiteTypeRows =
+    groupBy !== "entite"
+      ? []
+      : Object.values(
+          groupedRows.reduce((accumulator, group) => {
+            const typeLabel = entiteTypeByName[group.label] ??
+              (group.label.includes("|")
+                ? "Rattachements multiples"
+                : "Type non renseigne");
+
+            if (!accumulator[typeLabel]) {
+              accumulator[typeLabel] = {
+                typeLabel,
+                totalEffectif: 0,
+                groups: []
+              };
+            }
+
+            accumulator[typeLabel].groups.push(group);
+            accumulator[typeLabel].totalEffectif += group.effectif;
+            return accumulator;
+          }, {})
+        ).sort((left, right) => {
+          const direction = sortOrder === "desc" ? -1 : 1;
+          return left.typeLabel.localeCompare(right.typeLabel) * direction;
+        });
 
   function handleEntiteToggle(entite) {
     setSelectedEntites((currentValues) => toggleValueInList(currentValues, entite));
@@ -243,6 +280,40 @@ export default function EffectifPage() {
 
       {groupBy === "none" ? (
         <DataTable columns={columns} data={sortedRows} />
+      ) : groupBy === "entite" ? (
+        <div className="effectif-type-groups">
+          {groupedEntiteTypeRows.map((typeGroup) => (
+            <details key={typeGroup.typeLabel} className="effectif-type-group-card">
+              <summary className="effectif-type-group-summary">
+                <span className="effectif-type-group-label">{typeGroup.typeLabel}</span>
+                <span className="effectif-group-meta">
+                  <span className="effectif-group-count">
+                    {`${typeGroup.totalEffectif} personne(s)`}
+                  </span>
+                  <span className="effectif-filter-arrow" aria-hidden="true" />
+                </span>
+              </summary>
+
+              <div className="effectif-groups">
+                {typeGroup.groups.map((group) => (
+                  <details key={group.label} className="effectif-group-card">
+                    <summary className="effectif-group-summary">
+                      <span className="effectif-group-label">{group.label}</span>
+                      <span className="effectif-group-meta">
+                        <span className="effectif-group-count">
+                          {`${group.effectif} personne(s)`}
+                        </span>
+                        <span className="effectif-filter-arrow" aria-hidden="true" />
+                      </span>
+                    </summary>
+
+                    <DataTable columns={columns} data={group.members} />
+                  </details>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
       ) : (
         <div className="effectif-groups">
           {groupedRows.map((group) => (

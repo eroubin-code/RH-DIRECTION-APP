@@ -40,6 +40,21 @@ function isEquipeType(value) {
   return String(value ?? "").trim().toLocaleLowerCase() === "equipe";
 }
 
+const RESPONSABLES_BY_ENTITE = {
+  ADMINFRA: "Fabienne LASTERE ITCAINA",
+  INFORMATIQUE: "Eric ROUBIN",
+  PLATEAUBS: "Brice KAUFFMANN"
+};
+
+const ENTITE_LABEL_OVERRIDES = {
+  PLATEAUBS: "Plateformes scientifiques"
+};
+
+function getEntiteDisplayLabel(value) {
+  const normalizedValue = String(value ?? "").trim();
+  return ENTITE_LABEL_OVERRIDES[normalizedValue] ?? normalizedValue;
+}
+
 export default function EntitesPage() {
   const [rows, setRows] = useState([]);
   const [effectifRows, setEffectifRows] = useState([]);
@@ -72,7 +87,9 @@ export default function EntitesPage() {
     .map((group) => ({
       ...group,
       rows: [...group.rows].sort((left, right) =>
-        String(left.entite).localeCompare(String(right.entite))
+        getEntiteDisplayLabel(left.entite).localeCompare(
+          getEntiteDisplayLabel(right.entite)
+        )
       )
     }));
 
@@ -87,6 +104,12 @@ export default function EntitesPage() {
   }
 
   function getResponsableLabel(row, members) {
+    const entityOverride = RESPONSABLES_BY_ENTITE[row.entite];
+
+    if (entityOverride) {
+      return entityOverride;
+    }
+
     if (!isEquipeType(row.type_entite)) {
       return row.responsable || "Responsable non renseigné";
     }
@@ -141,7 +164,9 @@ export default function EntitesPage() {
                     >
                       <summary className="entites-accordion-summary">
                         <span className="entites-accordion-main">
-                          <span className="entites-accordion-title">{row.entite}</span>
+                          <span className="entites-accordion-title">
+                            {getEntiteDisplayLabel(row.entite)}
+                          </span>
                           <span className="entites-accordion-subtitle">
                             {responsableLabel}
                           </span>

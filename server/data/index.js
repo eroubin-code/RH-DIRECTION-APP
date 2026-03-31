@@ -148,6 +148,21 @@ async function readMysqlEntites() {
 }
 
 function computeDashboard({ effectif, departs, badges, entites }) {
+  const typeEntiteLabels = Object.entries(
+    entites.reduce((accumulator, row) => {
+      const label = String(row.type_entite ?? "").trim();
+
+      if (!label) {
+        return accumulator;
+      }
+
+      accumulator[label] = (accumulator[label] ?? 0) + 1;
+      return accumulator;
+    }, {})
+  )
+    .sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel))
+    .map(([label, count]) => `${label}: ${count}`);
+
   const recentDeparts = [...departs]
     .sort((left, right) => String(left.depart).localeCompare(String(right.depart)))
     .slice(0, 5)
@@ -165,10 +180,16 @@ function computeDashboard({ effectif, departs, badges, entites }) {
 
   return {
     kpis: [
-      { label: "Effectif total", value: effectif.length },
-      { label: "Departs a suivre", value: departs.length },
-      { label: "Badges actifs", value: activeBadgesCount },
-      { label: "Entites suivies", value: entites.length }
+      { label: "Effectif total", value: effectif.length, sub: "Suivi en temps reel" },
+      { label: "Departs a suivre", value: departs.length, sub: "Perimetre a 30 jours" },
+      { label: "Badges actifs", value: activeBadgesCount, sub: "Statut badges en cours" },
+      {
+        label: "Entites suivies",
+        value: entites.length,
+        sub: typeEntiteLabels.length
+          ? typeEntiteLabels
+          : ["Types d'entité suivis"]
+      }
     ],
     recentDeparts
   };

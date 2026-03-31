@@ -22,7 +22,12 @@ export default function Dashboard() {
     <div className="page-section rh-section">
       <div className="kpi-grid">
         {data.kpis.map((item) => (
-          <KpiCard key={item.label} label={item.label} value={item.value} />
+          <KpiCard
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            sub={item.sub}
+          />
         ))}
       </div>
 

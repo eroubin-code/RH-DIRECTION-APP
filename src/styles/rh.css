@@ -43,18 +43,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   padding: 24px;
   background:
-    linear-gradient(180deg, rgba(31, 79, 122, 0.06), rgba(31, 79, 122, 0.02)),
+    linear-gradient(180deg, rgba(19, 44, 69, 0.18), rgba(19, 44, 69, 0.1)),
+    url("/images/rh-background.jpg") center / cover no-repeat,
     var(--bg-light);
 }
 
 .login-card {
   width: min(100%, 460px);
-  background: var(--bg-white);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   padding: 28px;
+}
+
+.login-card-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.login-card-brand .brand-logo {
+  width: 82px;
+  height: 82px;
+  border-radius: 20px;
+  box-shadow: 0 18px 28px rgba(15, 23, 42, 0.16);
 }
 
 .login-eyebrow {

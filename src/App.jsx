@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
+import BrandLogo from "./components/BrandLogo";
 import { getCurrentUser, login, logout } from "./services/api";
 
 import Dashboard from "./pages/Dashboard";
@@ -96,12 +97,9 @@ export default function App() {
     return (
       <main className="login-shell">
         <section className="login-card">
-          <p className="login-eyebrow">Connexion securisee</p>
-          <h1 className="login-title">Acces a RH Direction</h1>
-          <p className="login-text">
-            Connectez-vous avec le compte administrateur configure sur le backend.
-          </p>
-
+          <div className="login-card-brand">
+            <BrandLogo alt="Logo IECB - authentification" />
+          </div>
           <form className="login-form" onSubmit={handleLogin}>
             <label className="login-field">
               <span>Utilisateur</span>

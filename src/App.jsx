@@ -1,18 +1,20 @@
 // test codex local
 // Compose la structure principale de l'application et declare les routes RH.
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import { getCurrentUser, login, logout } from "./services/api";
 
 import Dashboard from "./pages/Dashboard";
+import StatistiquePage from "./pages/StatistiquePage";
 import EffectifPage from "./pages/EffectifPage";
 import DepartsPage from "./pages/DepartsPage";
 import BadgesPage from "./pages/BadgesPage";
 import EntitesPage from "./pages/EntitesPage";
 
 export default function App() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
   const [currentUser, setCurrentUser] = useState(null);
   const [error, setError] = useState("");
@@ -58,6 +60,7 @@ export default function App() {
       const user = await login(form.username, form.password);
       setCurrentUser(user);
       setForm({ username: "", password: "" });
+      navigate("/dashboard", { replace: true });
     } catch (loginError) {
       setError(loginError.message);
     } finally {
@@ -147,6 +150,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/statistique" element={<StatistiquePage />} />
             <Route path="/effectif" element={<EffectifPage />} />
             <Route path="/departs" element={<DepartsPage />} />
             <Route path="/badges" element={<BadgesPage />} />

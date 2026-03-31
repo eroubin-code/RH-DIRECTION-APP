@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
 import express from "express";
 import { appConfig } from "./config.js";
-import { getDataStatus, getRhDataset } from "./data/index.js";
+import {
+  getAnnualSnapshotReport,
+  getDataStatus,
+  getRhDataset
+} from "./data/index.js";
 import { users } from "./data/users.js";
 
 const app = express();
@@ -121,6 +125,18 @@ app.get("/api/entites", requireAuth, async (_request, response) => {
     response.json(dataset.entites);
   } catch (error) {
     response.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/statistiques/annuel", requireAuth, async (request, response) => {
+  try {
+    const snapshotDate = request.query.date ?? "";
+    const report = await getAnnualSnapshotReport(snapshotDate);
+    response.json(report);
+  } catch (error) {
+    const statusCode =
+      error.message === "Date d'arrete invalide." ? 400 : 500;
+    response.status(statusCode).json({ message: error.message });
   }
 });
 

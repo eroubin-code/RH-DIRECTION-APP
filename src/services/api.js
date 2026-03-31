@@ -110,3 +110,8 @@ export async function getBadges() {
 export async function getEntites() {
   return request("/api/entites");
 }
+
+export async function getAnnualStatistics(date) {
+  const params = new URLSearchParams({ date });
+  return request(`/api/statistiques/annuel?${params.toString()}`);
+}

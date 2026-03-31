@@ -60,7 +60,8 @@ function formatCellValue(column, row) {
   const isDateColumn =
     column.key === "depart" ||
     column.key === "date" ||
-    column.key === "date_depart";
+    column.key === "date_depart" ||
+    column.key === "date_arrivee";
 
   if (isDateColumn) {
     const rawValue = row[`${column.key}_raw`] ?? value;

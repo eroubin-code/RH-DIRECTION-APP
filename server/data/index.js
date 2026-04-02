@@ -220,6 +220,33 @@ function buildFunctionBuckets(rows) {
   }));
 }
 
+function buildDepartureDateBuckets(rows) {
+  const scopedRows = rows.filter((row) => {
+    const normalizedFunction = String(row.fonction ?? "").trim().toLowerCase();
+    return !normalizedFunction.includes("stagiaire");
+  });
+  const withDateCount = scopedRows.filter((row) =>
+    String(row.date_depart_raw ?? "").trim()
+  ).length;
+
+  return [
+    { label: "Contractuel", count: withDateCount },
+    { label: "Titulaire", count: scopedRows.length - withDateCount }
+  ];
+}
+
+function buildAssignmentUnitBuckets(rows) {
+  return buildCountRows(
+    rows.flatMap((row) =>
+      String(row.unite_tutelle ?? "")
+        .split(" | ")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => value.toUpperCase())
+    )
+  );
+}
+
 function inferEffectifTutelle(row) {
   const normalizedTutelle = String(row.tutelle ?? "").trim();
   const normalizedRattachement = String(row.entite ?? "").trim().toLowerCase();
@@ -274,7 +301,14 @@ async function readMysqlAnnualSnapshot(snapshotDate) {
       "      ORDER BY e.nom SEPARATOR ' | '",
       "    ),",
       "    ''",
-      "  ) AS rattachement_types",
+      "  ) AS rattachement_types,",
+      "  COALESCE(",
+      "    GROUP_CONCAT(",
+      "      DISTINCT NULLIF(TRIM(COALESCE(e.unite_tutelle, '')), '')",
+      "      ORDER BY e.unite_tutelle SEPARATOR ' | '",
+      "    ),",
+      "    ''",
+      "  ) AS unite_tutelle",
       "FROM personnes AS p",
       "LEFT JOIN typesPersonnes AS tp ON tp.id = p.typesPersonne_id",
       "LEFT JOIN tutellesPersonnes AS tup ON tup.id = p.tutellesPersonne_id",
@@ -321,7 +355,8 @@ async function readMysqlAnnualSnapshot(snapshotDate) {
       date_arrivee_raw: row.date_arrivee,
       date_depart: String(row.date_depart ?? "").trim() ? row.date_depart : "Permanent",
       date_depart_raw: row.date_depart,
-      rattachement_types: row.rattachement_types
+      rattachement_types: row.rattachement_types,
+      unite_tutelle: row.unite_tutelle
     };
   });
 
@@ -332,9 +367,11 @@ async function readMysqlAnnualSnapshot(snapshotDate) {
       totalPersonnel: normalizedRows.length,
       sexes: buildCountRows(normalizedRows.map((row) => row.sexe)),
       statuses: buildCountRows(normalizedRows.map((row) => row.statut)),
+      departureDates: buildDepartureDateBuckets(normalizedRows),
       functions: buildFunctionBuckets(
         normalizedRows.map((row) => row.fonction)
       ),
+      assignmentUnits: buildAssignmentUnitBuckets(normalizedRows),
       nationalities: buildCountRows(normalizedRows.map((row) => row.nationalite)),
       tutelles: buildCountRows(
         normalizedRows.map((row) => bucketTutelle(row.tutelle))

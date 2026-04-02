@@ -84,7 +84,9 @@ export default function StatistiquePage() {
       totalPersonnel: 0,
       sexes: [],
       statuses: [],
+      departureDates: [],
       functions: [],
+      assignmentUnits: [],
       nationalities: [],
       tutelles: [],
       rattachementTypes: []
@@ -138,6 +140,11 @@ export default function StatistiquePage() {
   const topTutelles = useMemo(
     () => report.summary.tutelles.slice(0, 8),
     [report.summary.tutelles]
+  );
+
+  const topAssignmentUnits = useMemo(
+    () => report.summary.assignmentUnits.slice(0, 8),
+    [report.summary.assignmentUnits]
   );
 
   function handleExport() {
@@ -197,6 +204,24 @@ export default function StatistiquePage() {
 
       <div className="stats-grid">
         <PieChart
+          title="Tutelles"
+          items={topTutelles}
+          emptyLabel="Aucune tutelle a afficher"
+        />
+
+        <PieChart
+          title="Unite d'affectation"
+          items={topAssignmentUnits}
+          emptyLabel="Aucune unite a afficher"
+        />
+
+        <PieChart
+          title="Types de rattachement"
+          items={report.summary.rattachementTypes}
+          emptyLabel="Aucun rattachement a afficher"
+        />
+
+        <PieChart
           title="Repartition par fonction"
           items={topFunctions}
           emptyLabel="Aucune fonction a afficher"
@@ -209,21 +234,15 @@ export default function StatistiquePage() {
         />
 
         <PieChart
+          title="Contractuels / titulaires"
+          items={report.summary.departureDates}
+          emptyLabel="Aucune information disponible"
+        />
+
+        <PieChart
           title="Nationalites"
           items={topNationalities}
           emptyLabel="Aucune nationalite a afficher"
-        />
-
-        <PieChart
-          title="Tutelles"
-          items={topTutelles}
-          emptyLabel="Aucune tutelle a afficher"
-        />
-
-        <PieChart
-          title="Types de rattachement"
-          items={report.summary.rattachementTypes}
-          emptyLabel="Aucun rattachement a afficher"
         />
       </div>
     </section>

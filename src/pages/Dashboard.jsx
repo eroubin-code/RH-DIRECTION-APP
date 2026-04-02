@@ -3,6 +3,16 @@ import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
 import { getDashboardData } from "../services/api";
 
+function formatTeamLabel(value) {
+  const normalizedValue = String(value ?? "").trim().toLowerCase();
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  return normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1);
+}
+
 function MetricList({ title, items, emptyLabel = "Aucune donnee disponible" }) {
   return (
     <section className="content-card rh-panel dashboard-panel">
@@ -26,24 +36,34 @@ function MetricList({ title, items, emptyLabel = "Aucune donnee disponible" }) {
   );
 }
 
-function QuickBreakdown({ title, items, emptyLabel = "Aucune donnee disponible" }) {
-  const total = items.reduce((sum, item) => sum + Number(item.count ?? item.value ?? 0), 0);
+function QuickBreakdown({
+  title,
+  items,
+  detailsByLabel = {},
+  emptyLabel = "Aucune donnee disponible"
+}) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const total = safeItems.reduce((sum, item) => sum + Number(item.count ?? item.value ?? 0), 0);
 
   return (
     <section className="dashboard-breakdown">
       <h4 className="dashboard-breakdown-title">{title}</h4>
 
       <div className="dashboard-breakdown-list">
-        {items.length > 0 ? (
-          items.map((item) => {
+        {safeItems.length > 0 ? (
+          safeItems.map((item) => {
             const value = Number(item.count ?? item.value ?? 0);
-            const width = total > 0 ? `${Math.round((value / total) * 100)}%` : "0%";
+            const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+            const width = `${percent}%`;
+            const details = Array.isArray(detailsByLabel[item.label])
+              ? detailsByLabel[item.label]
+              : [];
 
             return (
               <div className="dashboard-breakdown-row" key={item.label}>
                 <div className="dashboard-breakdown-head">
                   <span>{item.label}</span>
-                  <strong>{value}</strong>
+                  <strong>{`${value} (${percent}%)`}</strong>
                 </div>
                 <div className="dashboard-breakdown-track">
                   <div
@@ -51,6 +71,11 @@ function QuickBreakdown({ title, items, emptyLabel = "Aucune donnee disponible" 
                     style={{ width }}
                   />
                 </div>
+                {details.length > 0 ? (
+                  <p className="dashboard-breakdown-details">
+                    {details.map(formatTeamLabel).join(", ")}
+                  </p>
+                ) : null}
               </div>
             );
           })
@@ -68,7 +93,8 @@ export default function Dashboard() {
     recentDeparts: [],
     alerts: [],
     functionBuckets: [],
-    sexBuckets: [],
+    tutelleBuckets: [],
+    assignmentGroups: [],
     entiteBuckets: [],
     qualityItems: []
   });
@@ -76,6 +102,13 @@ export default function Dashboard() {
   useEffect(() => {
     getDashboardData().then(setData);
   }, []);
+
+  const assignmentDetailsByLabel = Object.fromEntries(
+    (Array.isArray(data.assignmentGroups) ? data.assignmentGroups : []).map((group) => [
+      group.label,
+      group.items ?? []
+    ])
+  );
 
   const columns = [
     { key: "nom", label: "Nom" },
@@ -102,19 +135,20 @@ export default function Dashboard() {
 
         <section className="content-card rh-panel dashboard-panel">
           <div className="section-title">
-            <h3 className="rh-panel-title">Répartition rapide</h3>
+            <h3 className="rh-panel-title">Repartition Tutelles / Unite d'affectation</h3>
           </div>
 
           <div className="dashboard-chart-grid">
             <QuickBreakdown
-              title="Fonctions"
-              items={data.functionBuckets}
-              emptyLabel="Aucune fonction a afficher"
+              title="Tutelles"
+              items={data.tutelleBuckets}
+              emptyLabel="Aucune tutelle a afficher"
             />
             <QuickBreakdown
-              title="Femmes / Hommes"
-              items={data.sexBuckets}
-              emptyLabel="Aucune repartition disponible"
+              title="Unites d'affectation"
+              items={data.assignmentUnits}
+              detailsByLabel={assignmentDetailsByLabel}
+              emptyLabel="Aucune unite a afficher"
             />
           </div>
         </section>

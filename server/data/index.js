@@ -401,6 +401,13 @@ async function readMysqlEffectif() {
       "    GROUP_CONCAT(DISTINCT e.nom ORDER BY e.nom SEPARATOR ' | '),",
       "    ''",
       "  ) AS entite,",
+      "  COALESCE(",
+      "    GROUP_CONCAT(",
+      "      DISTINCT NULLIF(TRIM(COALESCE(e.unite_tutelle, '')), '')",
+      "      ORDER BY e.unite_tutelle SEPARATOR ' | '",
+      "    ),",
+      "    ''",
+      "  ) AS unite_tutelle,",
       "  '' AS badge,",
       "  '' AS statut_badge,",
       "  p.civilite AS civilite,",
@@ -479,6 +486,7 @@ async function readMysqlEntites() {
       "  te.id AS type_entite_id,",
       "  COALESCE(NULLIF(te.description, ''), te.nom) AS type_entite,",
       "  e.nom AS entite,",
+      "  COALESCE(NULLIF(TRIM(e.unite_tutelle), ''), '') AS unite_tutelle,",
       "  '' AS responsable,",
       "  COUNT(DISTINCT p.id) AS effectif",
       "FROM entites AS e",
@@ -532,9 +540,47 @@ function computeDashboard({ effectif, departs, badges, entites }) {
   const functionBuckets = buildFunctionBuckets(
     effectif.map((row) => row.fonction)
   );
-  const sexBuckets = buildCountRows(
-    effectif.map((row) => inferSex(row.civilite))
-  );
+  const tutelleBuckets = buildCountRows(
+    effectif.map((row) => inferEffectifTutelle(row))
+  ).slice(0, 5);
+  const assignmentUnits = buildCountRows(
+    effectif.flatMap((row) =>
+      String(row.unite_tutelle ?? "")
+        .split(" | ")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => value.toUpperCase())
+    )
+  ).slice(0, 5);
+  const assignmentGroups = Object.values(
+    entites.reduce((accumulator, row) => {
+      const typeLabel = String(row.type_entite ?? "").trim().toLowerCase();
+      const unitLabel = String(row.unite_tutelle ?? "").trim().toUpperCase();
+      const entiteLabel = String(row.entite ?? "").trim();
+
+      if (typeLabel !== "equipe" || !unitLabel || !entiteLabel) {
+        return accumulator;
+      }
+
+      if (!accumulator[unitLabel]) {
+        accumulator[unitLabel] = {
+          label: unitLabel,
+          items: []
+        };
+      }
+
+      if (!accumulator[unitLabel].items.includes(entiteLabel)) {
+        accumulator[unitLabel].items.push(entiteLabel);
+      }
+
+      return accumulator;
+    }, {})
+  )
+    .map((group) => ({
+      ...group,
+      items: group.items.sort((left, right) => left.localeCompare(right, "fr"))
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, "fr"));
   const entiteBuckets = buildCountRows(
     effectif.flatMap((row) =>
       String(row.entite ?? "")
@@ -625,7 +671,9 @@ function computeDashboard({ effectif, departs, badges, entites }) {
     recentDeparts,
     alerts,
     functionBuckets,
-    sexBuckets,
+    tutelleBuckets,
+    assignmentUnits,
+    assignmentGroups,
     entiteBuckets,
     qualityItems
   };

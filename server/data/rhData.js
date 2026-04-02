@@ -28,6 +28,16 @@ export const rhData = {
         date: "2026-04-14",
         entite: "Bioinformatique"
       }
+    ],
+    tutelleBuckets: [
+      { label: "CNRS", count: 2 },
+      { label: "Universite", count: 1 },
+      { label: "Inserm", count: 1 }
+    ],
+    assignmentGroups: [
+      { label: "CBMN", items: ["Equipe Bioinformatique"] },
+      { label: "ISM", items: ["Plateforme Imagerie"] },
+      { label: "MFP", items: ["Administration", "Informatique"] }
     ]
   },
   effectif: [
@@ -37,7 +47,8 @@ export const rhData = {
       nom: "Martin",
       prenom: "Claire",
       fonction: "Ingenieure",
-      entite: "Plateforme Imagerie"
+      entite: "Plateforme Imagerie",
+      tutelle: "CNRS"
     },
     {
       id: 2,
@@ -45,7 +56,8 @@ export const rhData = {
       nom: "Durand",
       prenom: "Paul",
       fonction: "Technicien",
-      entite: "Administration"
+      entite: "Administration",
+      tutelle: "Universite"
     },
     {
       id: 3,
@@ -53,7 +65,8 @@ export const rhData = {
       nom: "Nguyen",
       prenom: "Lina",
       fonction: "Chercheuse",
-      entite: "Bioinformatique"
+      entite: "Bioinformatique",
+      tutelle: "CNRS"
     },
     {
       id: 4,
@@ -61,7 +74,8 @@ export const rhData = {
       nom: "Roussel",
       prenom: "Marc",
       fonction: "Assistant ingenieur",
-      entite: "Informatique"
+      entite: "Informatique",
+      tutelle: "Inserm"
     }
   ],
   departs: [
@@ -116,25 +130,33 @@ export const rhData = {
   entites: [
     {
       id: 1,
+      type_entite: "equipe",
       entite: "Plateforme Imagerie",
+      unite_tutelle: "ISM",
       responsable: "Dr A. Bernard",
       effectif: 18
     },
     {
       id: 2,
+      type_entite: "equipe",
       entite: "Administration",
+      unite_tutelle: "MFP",
       responsable: "Mme E. Robert",
       effectif: 12
     },
     {
       id: 3,
+      type_entite: "equipe",
       entite: "Bioinformatique",
+      unite_tutelle: "CBMN",
       responsable: "Dr N. Leclerc",
       effectif: 9
     },
     {
       id: 4,
+      type_entite: "equipe",
       entite: "Informatique",
+      unite_tutelle: "MFP",
       responsable: "E. Roubin",
       effectif: 4
     }

@@ -18,6 +18,17 @@ npm install
 npm run dev
 ```
 
+Pour un bac a sable local sans dependre de MySQL ni modifier `.env` :
+
+- Windows : `start-sandbox-local.bat`
+- Linux / WSL / Git Bash : `bash ./start-sandbox-local.sh`
+
+Pour une session de test beta en reseau local depuis Windows :
+
+- Windows : `start-beta-local.bat`
+- le frontend ecoute sur `0.0.0.0:5173`
+- utilise l'IP de la machine qui lance le script pour y acceder depuis un autre poste
+
 3. Ouvrir l'application :
 
 - frontend : `http://localhost:5173`
@@ -27,6 +38,11 @@ Compte local par defaut :
 
 - utilisateur : `sysadm`
 - mot de passe : `Tp0sana`
+
+Compte beta local disponible si active pour les tests :
+
+- utilisateur : `Betauser`
+- mot de passe : `Betauser007`
 
 ## Structure
 

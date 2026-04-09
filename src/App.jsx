@@ -14,6 +14,10 @@ import DepartsPage from "./pages/DepartsPage";
 import BadgesPage from "./pages/BadgesPage";
 import EntitesPage from "./pages/EntitesPage";
 
+const APP_VERSION = "Version 1.2 Beta";
+const USERNAME_PLACEHOLDER = "Votre identifiant";
+const PASSWORD_PLACEHOLDER = "Votre mot de passe";
+
 export default function App() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
@@ -89,6 +93,7 @@ export default function App() {
             Verification de votre acces au backend local en cours.
           </p>
         </section>
+        <p className="app-version-badge">{APP_VERSION}</p>
       </main>
     );
   }
@@ -107,7 +112,7 @@ export default function App() {
                 autoComplete="username"
                 name="username"
                 onChange={handleChange}
-                placeholder="sysadm"
+                placeholder={USERNAME_PLACEHOLDER}
                 type="text"
                 value={form.username}
               />
@@ -119,7 +124,7 @@ export default function App() {
                 autoComplete="current-password"
                 name="password"
                 onChange={handleChange}
-                placeholder="Tp0sana"
+                placeholder={PASSWORD_PLACEHOLDER}
                 type="password"
                 value={form.password}
               />
@@ -132,6 +137,7 @@ export default function App() {
             </button>
           </form>
         </section>
+        <p className="app-version-badge">{APP_VERSION}</p>
       </main>
     );
   }
@@ -155,6 +161,9 @@ export default function App() {
             <Route path="/entites" element={<EntitesPage />} />
           </Routes>
         </main>
+        <footer className="app-version-footer">
+          <span>{APP_VERSION}</span>
+        </footer>
       </div>
     </div>
   );

@@ -536,6 +536,9 @@ function computeDashboard({ effectif, departs, badges, entites }) {
   const activeBadgesCount = badges.filter((row) =>
     String(row.statut).toLowerCase().includes("actif")
   ).length;
+  const startupCount = entites.filter((row) =>
+    String(row.type_entite ?? "").trim().toLowerCase() === "startup"
+  ).length;
 
   const functionBuckets = buildFunctionBuckets(
     effectif.map((row) => row.fonction)
@@ -643,9 +646,7 @@ function computeDashboard({ effectif, departs, badges, entites }) {
     },
     {
       label: "Startups suivies",
-      value: entites.filter((row) =>
-        String(row.type_entite ?? "").trim().toLowerCase() === "startup"
-      ).length
+      value: startupCount
     },
     {
       label: "Tutelles non renseignees",

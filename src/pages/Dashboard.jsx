@@ -116,11 +116,14 @@ export default function Dashboard() {
     { key: "date", label: "Date départ" },
     { key: "entite", label: "Entité" }
   ];
+  const visibleKpis = (Array.isArray(data.kpis) ? data.kpis : []).filter(
+    (item) => !["equipes", "start-up"].includes(String(item.label).toLowerCase())
+  );
 
   return (
     <div className="page-section rh-section">
       <div className="kpi-grid">
-        {data.kpis.slice(0, 3).map((item) => (
+        {visibleKpis.map((item) => (
           <KpiCard
             key={item.label}
             label={item.label}

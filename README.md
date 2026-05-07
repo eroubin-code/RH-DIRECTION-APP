@@ -1,8 +1,28 @@
 # RH Direction App
 
+Version actuelle : **1.3 Beta**
+
 Application web RH de pilotage pour la direction, construite avec React + Vite côté frontend et Node/Express côté backend.
 
 L'interface propose un tableau de bord RH, des pages de suivi de l'effectif, des départs, des badges et des entités. Le backend peut fonctionner soit avec des données simulées, soit avec une base MySQL `iecbman2020`.
+
+## Nouveautes 1.3 Beta
+
+- Navigation principale en onglets horizontaux, avec forme parallelogramme, contours blancs et espacement avec le contenu.
+- Acces `Administration` deplace dans la barre d'actions du haut pour les roles `admin` et `operateur`.
+- Page Administration pour creer des utilisateurs applicatifs avec role `beta`, `operateur` ou `admin`.
+- Persistance locale des utilisateurs ajoutes dans `server/data/users.store.json` ignore par Git.
+- Ajustements visuels du login, du layout principal, des panneaux RH et des KPI.
+- Deploiement valide sur Nginx avec frontend servi depuis `dist/` et proxy `/api/` vers le backend Node sur `3001`.
+
+## Documentation
+
+- [Notes de version](CHANGELOG.md)
+- [Release 1.3 Beta](docs/RELEASE-1.3-BETA.md)
+- [Guide de deploiement](docs/DEPLOYMENT.md)
+- [Exploitation serveur](docs/OPERATIONS.md)
+- [Administration utilisateurs](docs/ADMINISTRATION.md)
+- [Configuration](docs/CONFIGURATION.md)
 
 ## Demarrage
 
@@ -134,3 +154,28 @@ http://localhost:3001/api/health
 ```
 
 La reponse indique si l'application tourne en mode `mock` ou `mysql`, et si la connexion MySQL est etablie.
+
+## Deploiement Nginx
+
+Sur le serveur beta, l'application est prevue pour etre servie ainsi :
+
+- frontend build Vite : `/opt/rh-direction-app/dist`
+- backend Node/Express : service systemd `rh-direction-app.service`
+- URL publique locale : `http://rh-app.local.iecb.u-bordeaux.fr/`
+- proxy API Nginx : `/api/` vers `http://127.0.0.1:3001`
+
+Commandes de mise a jour habituelles apres upload des sources :
+
+```bash
+cd /opt/rh-direction-app
+npm install
+npm run build
+systemctl restart rh-direction-app.service
+```
+
+Verification serveur :
+
+```bash
+curl -s http://127.0.0.1:3001/api/health
+curl -I http://127.0.0.1/
+```

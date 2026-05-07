@@ -6,7 +6,7 @@ import {
   getDataStatus,
   getRhDataset
 } from "./data/index.js";
-import { users } from "./data/users.js";
+import { createUser, USER_ROLES, users } from "./data/users.js";
 
 const app = express();
 const port = appConfig.port;
@@ -40,6 +40,25 @@ function requireAuth(request, response, next) {
   request.user = session.user;
   request.token = token;
   next();
+}
+
+function requireRole(allowedRoles) {
+  return (request, response, next) => {
+    if (!allowedRoles.includes(request.user?.role)) {
+      response.status(403).json({ message: "Acces reserve." });
+      return;
+    }
+
+    next();
+  };
+}
+
+function isUsernameAvailable(username) {
+  const normalizedUsername = username.toLocaleLowerCase();
+
+  return !users.some(
+    (user) => user.username.toLocaleLowerCase() === normalizedUsername
+  );
 }
 
 app.use(express.json());
@@ -82,6 +101,58 @@ app.post("/api/auth/logout", requireAuth, (request, response) => {
   sessions.delete(request.token);
   response.status(204).end();
 });
+
+app.get(
+  "/api/admin/users",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (_request, response) => {
+    response.json(users.map(sanitizeUser));
+  }
+);
+
+app.post(
+  "/api/admin/users",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (request, response) => {
+    const username = String(request.body?.username ?? "").trim();
+    const password = String(request.body?.password ?? "");
+    const role = String(request.body?.role ?? "beta").trim();
+
+    if (username.length < 3) {
+      response
+        .status(400)
+        .json({ message: "Le nom utilisateur doit contenir au moins 3 caracteres." });
+      return;
+    }
+
+    if (password.length < 6) {
+      response
+        .status(400)
+        .json({ message: "Le mot de passe doit contenir au moins 6 caracteres." });
+      return;
+    }
+
+    if (!USER_ROLES.includes(role)) {
+      response.status(400).json({ message: "Role utilisateur invalide." });
+      return;
+    }
+
+    if (!isUsernameAvailable(username)) {
+      response.status(409).json({ message: "Cet utilisateur existe deja." });
+      return;
+    }
+
+    const user = createUser({
+      username,
+      passwordHash: hashPassword(password),
+      role
+    });
+
+    response.status(201).json(sanitizeUser(user));
+  }
+);
 
 app.get("/api/dashboard", requireAuth, async (_request, response) => {
   try {

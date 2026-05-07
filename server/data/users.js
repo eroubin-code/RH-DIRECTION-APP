@@ -1,5 +1,11 @@
-// Utilisateur initial du backend avec mot de passe stocke sous forme de hash scrypt.
-export const users = [
+import fs from "node:fs";
+
+const usersStorePath = new URL("./users.store.json", import.meta.url);
+
+export const USER_ROLES = ["admin", "operateur", "beta"];
+
+// Utilisateurs initiaux du backend avec mot de passe stocke sous forme de hash scrypt.
+const seedUsers = [
   {
     id: 1,
     username: "sysadm",
@@ -36,3 +42,39 @@ export const users = [
     role: "beta"
   }
 ];
+
+function loadUsers() {
+  if (!fs.existsSync(usersStorePath)) {
+    return [...seedUsers];
+  }
+
+  try {
+    const storedUsers = JSON.parse(fs.readFileSync(usersStorePath, "utf-8"));
+    return Array.isArray(storedUsers) ? storedUsers : [...seedUsers];
+  } catch {
+    return [...seedUsers];
+  }
+}
+
+function saveUsers() {
+  fs.writeFileSync(usersStorePath, `${JSON.stringify(users, null, 2)}\n`);
+}
+
+export const users = loadUsers();
+
+export function createUser({ username, passwordHash, role }) {
+  const nextId =
+    users.reduce((largestId, user) => Math.max(largestId, Number(user.id)), 0) +
+    1;
+  const user = {
+    id: nextId,
+    username,
+    passwordHash,
+    role
+  };
+
+  users.push(user);
+  saveUsers();
+
+  return user;
+}

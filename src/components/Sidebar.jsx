@@ -1,6 +1,5 @@
-// Composant de menu lateral pour naviguer entre les pages RH.
+// Navigation principale affichee sous forme d'onglets.
 import { NavLink } from "react-router-dom";
-import BrandLogo from "./BrandLogo";
 
 const links = [
   { to: "/dashboard", label: "Dashboard" },
@@ -13,28 +12,20 @@ const links = [
 
 export default function Sidebar() {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <BrandLogo alt="Logo IECB - navigation" />
-        <div>
-          <h1>RH Direction</h1>
-          <p>IECB</p>
-        </div>
-      </div>
-
-      <nav className="sidebar-nav">
+    <div className="tabs-shell">
+      <nav className="tabs-nav" aria-label="Navigation principale">
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              isActive ? "nav-link active" : "nav-link"
+              isActive ? "tab-link active" : "tab-link"
             }
           >
-            {link.label}
+            <span className="tab-link-label">{link.label}</span>
           </NavLink>
         ))}
       </nav>
-    </aside>
+    </div>
   );
 }

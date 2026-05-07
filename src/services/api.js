@@ -115,3 +115,14 @@ export async function getAnnualStatistics(date) {
   const params = new URLSearchParams({ date });
   return request(`/api/statistiques/annuel?${params.toString()}`);
 }
+
+export async function getUsers() {
+  return request("/api/admin/users");
+}
+
+export async function createUser(user) {
+  return request("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify(user)
+  });
+}

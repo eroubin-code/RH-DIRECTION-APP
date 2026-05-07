@@ -13,10 +13,12 @@ import EffectifPage from "./pages/EffectifPage";
 import DepartsPage from "./pages/DepartsPage";
 import BadgesPage from "./pages/BadgesPage";
 import EntitesPage from "./pages/EntitesPage";
+import AdministrationPage from "./pages/AdministrationPage";
 
-const APP_VERSION = "Version 1.2 Beta";
+const APP_VERSION = "Version 1.3 Beta";
 const USERNAME_PLACEHOLDER = "Votre identifiant";
 const PASSWORD_PLACEHOLDER = "Votre mot de passe";
+const ADMIN_ROLES = ["admin", "operateur"];
 
 export default function App() {
   const navigate = useNavigate();
@@ -105,6 +107,11 @@ export default function App() {
           <div className="login-card-brand">
             <BrandLogo alt="Logo IECB - authentification" />
           </div>
+          <div className="login-heading">
+            <p className="login-eyebrow">Espace sécurisé</p>
+            <h1 className="login-title">RH Direction App</h1>
+            <p className="login-text">Pilotage RH et indicateurs direction</p>
+          </div>
           <form className="login-form" onSubmit={handleLogin}>
             <label className="login-field">
               <span>Utilisateur</span>
@@ -144,11 +151,11 @@ export default function App() {
 
   return (
     <div className="app-shell app-rh">
-      {/* Navigation laterale commune a toutes les pages. */}
-      <Sidebar />
       <div className="main-area">
         {/* En-tete partage par toutes les vues du projet. */}
-        <Header currentUser={currentUser.username} onLogout={handleLogout} />
+        <Header currentUser={currentUser} onLogout={handleLogout} />
+        {/* Navigation principale presentee sous forme d'onglets. */}
+        <Sidebar currentUser={currentUser} />
         <main className="page-content">
           {/* Routage principal vers les pages metier. */}
           <Routes>
@@ -159,6 +166,16 @@ export default function App() {
             <Route path="/departs" element={<DepartsPage />} />
             <Route path="/badges" element={<BadgesPage />} />
             <Route path="/entites" element={<EntitesPage />} />
+            <Route
+              path="/administration"
+              element={
+                ADMIN_ROLES.includes(currentUser.role) ? (
+                  <AdministrationPage />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
           </Routes>
         </main>
         <footer className="app-version-footer">

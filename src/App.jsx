@@ -16,6 +16,7 @@ import EntitesPage from "./pages/EntitesPage";
 import AdministrationPage from "./pages/AdministrationPage";
 
 const APP_VERSION = "Version 1.3 Beta";
+const FOOTER_NOTE = `RH Direction App - ${APP_VERSION}`;
 const USERNAME_PLACEHOLDER = "Votre identifiant";
 const PASSWORD_PLACEHOLDER = "Votre mot de passe";
 const ADMIN_ROLES = ["admin", "operateur"];
@@ -179,7 +180,7 @@ export default function App() {
           </Routes>
         </main>
         <footer className="app-version-footer">
-          <span>{APP_VERSION}</span>
+          <span>{FOOTER_NOTE}</span>
         </footer>
       </div>
     </div>

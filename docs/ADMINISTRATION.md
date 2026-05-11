@@ -5,15 +5,24 @@
 La page Administration est disponible a l'URL applicative :
 
 ```text
-/administration
+/admin
 ```
 
-Elle est affichee dans la barre d'actions du haut uniquement pour les roles :
+Un acces direct a `/admin` affiche d'abord la page d'authentification si aucune session n'est active.
+
+Elle est disponible uniquement pour les roles :
 
 - `admin`
 - `operateur`
 
 Les utilisateurs `beta` n'ont pas acces a cette page.
+
+Sur cette page, les onglets metier sont remplaces par des onglets dedies a l'administration :
+
+- `Utilisateurs`
+- `Personnel`
+- `Batiments`
+- `Plans`
 
 ## Creation d'un utilisateur
 
@@ -24,6 +33,18 @@ Champs requis :
 - role : `beta`, `operateur` ou `admin`
 
 Le backend verifie que le nom utilisateur n'existe pas deja, sans tenir compte de la casse.
+
+## Personnel et plans
+
+L'onglet `Personnel` permet de preparer la creation d'une personne dans la base RH.
+
+Lors de la creation :
+
+- `userid` est genere avec les premieres lettres du prenom, ou de chaque prenom compose, suivies du nom complet normalise.
+- `mdp` est genere automatiquement sur 8 caracteres avec au moins une majuscule, un chiffre et un caractere special.
+- la personne est inseree dans `personnes`, puis rattachee a l'entite choisie via `personnes_entites`.
+
+Les onglets `Batiments` et `Plans` preparent les prochains modules d'administration. Les ecritures en base seront ajoutees apres validation du modele de donnees.
 
 ## Stockage
 

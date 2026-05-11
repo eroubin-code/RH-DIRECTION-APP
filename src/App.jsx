@@ -1,7 +1,7 @@
 // test codex local
 // Compose la structure principale de l'application et declare les routes RH.
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import BrandLogo from "./components/BrandLogo";
@@ -22,6 +22,7 @@ const PASSWORD_PLACEHOLDER = "Votre mot de passe";
 const ADMIN_ROLES = ["admin", "operateur"];
 
 export default function App() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
   const [currentUser, setCurrentUser] = useState(null);
@@ -68,7 +69,11 @@ export default function App() {
       const user = await login(form.username, form.password);
       setCurrentUser(user);
       setForm({ username: "", password: "" });
-      navigate("/dashboard", { replace: true });
+      const nextPath =
+        location.pathname === "/"
+          ? "/dashboard"
+          : `${location.pathname}${location.search}`;
+      navigate(nextPath, { replace: true });
     } catch (loginError) {
       setError(loginError.message);
     } finally {
@@ -168,7 +173,7 @@ export default function App() {
             <Route path="/badges" element={<BadgesPage />} />
             <Route path="/entites" element={<EntitesPage />} />
             <Route
-              path="/administration"
+              path="/admin"
               element={
                 ADMIN_ROLES.includes(currentUser.role) ? (
                   <AdministrationPage />
@@ -177,6 +182,7 @@ export default function App() {
                 )
               }
             />
+            <Route path="/administration" element={<Navigate to="/admin" replace />} />
           </Routes>
         </main>
         <footer className="app-version-footer">

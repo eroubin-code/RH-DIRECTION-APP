@@ -8,8 +8,9 @@ La version 1.3 Beta consolide l'interface de navigation, ajoute une zone d'admin
 
 - Les onglets de navigation sont horizontaux, inclines, avec contour blanc et sans barre de defilement horizontale.
 - Le contenu principal est separe des onglets par un espace global.
-- Le lien `Administration` n'est plus un onglet metier ; il est affiche dans la barre d'actions pour les roles habilites.
-- La page Administration permet de creer des utilisateurs applicatifs.
+- L'administration n'est plus affichee dans la navigation ; elle est disponible par acces direct a `/admin` pour les roles habilites.
+- Sur `/admin`, les onglets metier sont remplaces par les modules `Utilisateurs`, `Personnel`, `Batiments` et `Plans`.
+- La page Administration permet de creer des utilisateurs applicatifs et prepare les futurs modules personnel et plans batiment.
 - Les utilisateurs crees sont conserves dans `server/data/users.store.json`.
 
 ## Roles
@@ -20,8 +21,8 @@ La version 1.3 Beta consolide l'interface de navigation, ajoute une zone d'admin
 
 ## Fichiers principaux
 
-- `src/App.jsx` : version affichee, routage et protection de `/administration`.
-- `src/components/Header.jsx` : bouton Administration dans la barre haute.
+- `src/App.jsx` : version affichee, routage et protection de `/admin`.
+- `src/components/Header.jsx` : actions globales sans bouton Administration.
 - `src/components/Sidebar.jsx` : onglets metier uniquement.
 - `src/pages/AdministrationPage.jsx` : formulaire et liste utilisateurs.
 - `src/styles/rh.css` : layout, onglets, panneaux et KPI.

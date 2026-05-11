@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import { appConfig } from "./config.js";
 import {
+  createPersonnel,
   getAnnualSnapshotReport,
   getDataStatus,
   getRhDataset
@@ -59,6 +60,77 @@ function isUsernameAvailable(username) {
   return !users.some(
     (user) => user.username.toLocaleLowerCase() === normalizedUsername
   );
+}
+
+function normalizeIdentifierPart(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLocaleLowerCase();
+}
+
+function buildPersonnelUserId(prenom, nom) {
+  const prenomInitials = String(prenom ?? "")
+    .trim()
+    .split(/[\s'-]+/)
+    .filter(Boolean)
+    .map((part) => normalizeIdentifierPart(part).charAt(0))
+    .join("");
+  const normalizedNom = normalizeIdentifierPart(nom);
+
+  return `${prenomInitials}${normalizedNom}` || "personne";
+}
+
+function generatePersonnelPassword() {
+  const lowercase = "abcdefghijkmnopqrstuvwxyz";
+  const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const specials = "!@#$%&*?";
+  const allCharacters = `${lowercase}${uppercase}${digits}${specials}`;
+  const characters = [
+    uppercase[crypto.randomInt(uppercase.length)],
+    digits[crypto.randomInt(digits.length)],
+    specials[crypto.randomInt(specials.length)]
+  ];
+
+  while (characters.length < 8) {
+    characters.push(allCharacters[crypto.randomInt(allCharacters.length)]);
+  }
+
+  for (let index = characters.length - 1; index > 0; index -= 1) {
+    const swapIndex = crypto.randomInt(index + 1);
+    [characters[index], characters[swapIndex]] = [
+      characters[swapIndex],
+      characters[index]
+    ];
+  }
+
+  return characters.join("");
+}
+
+function normalizeDateInput(value) {
+  const normalizedValue = String(value ?? "").trim();
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalizedValue) ? normalizedValue : "";
+}
+
+function normalizeCivilite(value) {
+  const normalizedValue = String(value ?? "").trim().toLowerCase();
+
+  if (normalizedValue === "madame" || normalizedValue === "mme") {
+    return "Mme";
+  }
+
+  if (
+    normalizedValue === "monsieur" ||
+    normalizedValue === "m." ||
+    normalizedValue === "m"
+  ) {
+    return "M.";
+  }
+
+  return "";
 }
 
 app.use(express.json());
@@ -151,6 +223,75 @@ app.post(
     });
 
     response.status(201).json(sanitizeUser(user));
+  }
+);
+
+app.post(
+  "/api/admin/personnel",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  async (request, response) => {
+    const civilite = normalizeCivilite(request.body?.civilite);
+    const nom = String(request.body?.nom ?? "").trim();
+    const prenom = String(request.body?.prenom ?? "").trim();
+    const naissance = normalizeDateInput(request.body?.naissance);
+    const pays = String(
+      request.body?.paysLibre || request.body?.pays || ""
+    ).trim();
+    const fonction = String(
+      request.body?.fonctionLibre || request.body?.fonction || ""
+    ).trim();
+    const entite = String(request.body?.entite ?? "").trim();
+    const tutelle = String(request.body?.tutelle ?? "").trim();
+    const arrivee = normalizeDateInput(request.body?.arrivee);
+    const isPermanent = request.body?.permanent !== false;
+    const depart = isPermanent ? "" : normalizeDateInput(request.body?.depart);
+
+    if (!civilite) {
+      response.status(400).json({ message: "Civilite invalide." });
+      return;
+    }
+
+    if (!nom || !prenom) {
+      response.status(400).json({ message: "Nom et prenom sont obligatoires." });
+      return;
+    }
+
+    if (!entite) {
+      response.status(400).json({ message: "Entite obligatoire." });
+      return;
+    }
+
+    if (!arrivee) {
+      response.status(400).json({ message: "Date d'arrivee obligatoire." });
+      return;
+    }
+
+    if (!isPermanent && !depart) {
+      response.status(400).json({ message: "Date de depart obligatoire." });
+      return;
+    }
+
+    try {
+      const personnel = await createPersonnel({
+        civilite,
+        nom,
+        prenom,
+        naissance,
+        pays,
+        fonction,
+        entite,
+        tutelle,
+        arrivee,
+        depart,
+        userid: buildPersonnelUserId(prenom, nom),
+        password: generatePersonnelPassword()
+      });
+
+      response.status(201).json(personnel);
+    } catch (error) {
+      response.status(500).json({ message: error.message });
+    }
   }
 );
 

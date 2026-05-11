@@ -40,6 +40,11 @@ async function queryRows(sql, params = []) {
   return normalizeRows(rows);
 }
 
+async function getConnection() {
+  const currentPool = await getPool();
+  return currentPool.getConnection();
+}
+
 function normalizeSnapshotDate(value) {
   const normalizedValue = String(value ?? "").trim();
 
@@ -147,6 +152,146 @@ function inferTutelle(tutelle, typePersonne, rattachement, rattachementTypes) {
   }
 
   return "Non renseignee";
+}
+
+async function getUniquePersonUserId(connection, preferredUserId) {
+  const baseUserId = String(preferredUserId ?? "").trim() || "personne";
+  let candidateUserId = baseUserId;
+  let suffix = 2;
+
+  while (true) {
+    const [rows] = await connection.query(
+      "SELECT id FROM personnes WHERE userid = ? LIMIT 1",
+      [candidateUserId]
+    );
+
+    if (rows.length === 0) {
+      return candidateUserId;
+    }
+
+    candidateUserId = `${baseUserId}${suffix}`;
+    suffix += 1;
+  }
+}
+
+async function findTypePersonneId(connection) {
+  const [rows] = await connection.query(
+    [
+      "SELECT id",
+      "FROM typesPersonnes",
+      "WHERE LOWER(nom) IN ('employe', 'agent')",
+      "ORDER BY CASE LOWER(nom) WHEN 'employe' THEN 0 WHEN 'agent' THEN 1 ELSE 2 END",
+      "LIMIT 1"
+    ].join(" ")
+  );
+
+  return rows[0]?.id ?? 1;
+}
+
+async function findTutelleId(connection, tutelle) {
+  const normalizedTutelle = String(tutelle ?? "").trim();
+
+  if (!normalizedTutelle) {
+    return null;
+  }
+
+  const [rows] = await connection.query(
+    [
+      "SELECT id",
+      "FROM tutellesPersonnes",
+      "WHERE nom = ? OR description = ?",
+      "ORDER BY id",
+      "LIMIT 1"
+    ].join(" "),
+    [normalizedTutelle, normalizedTutelle]
+  );
+
+  return rows[0]?.id ?? null;
+}
+
+async function findEntiteId(connection, entite) {
+  const normalizedEntite = String(entite ?? "").trim();
+
+  if (!normalizedEntite) {
+    return null;
+  }
+
+  const [rows] = await connection.query(
+    "SELECT id FROM entites WHERE nom = ? ORDER BY id LIMIT 1",
+    [normalizedEntite]
+  );
+
+  return rows[0]?.id ?? null;
+}
+
+export async function createPersonnel(personnel) {
+  if (appConfig.dataSource.mode !== "mysql") {
+    throw new Error("La creation de personnel necessite la base MySQL.");
+  }
+
+  const connection = await getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const typePersonneId = await findTypePersonneId(connection);
+    const tutelleId = await findTutelleId(connection, personnel.tutelle);
+    const entiteId = await findEntiteId(connection, personnel.entite);
+    const uniqueUserId = await getUniquePersonUserId(connection, personnel.userid);
+
+    if (!entiteId) {
+      throw new Error("Entite introuvable.");
+    }
+
+    const [insertResult] = await connection.query(
+      [
+        "INSERT INTO personnes",
+        "(",
+        "  civilite, nom, prenom, naissance, pays, tutellesPersonne_id,",
+        "  fonction, arrivee, depart, userid, mdp, typesPersonne_id,",
+        "  contact_personne_id",
+        ")",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"
+      ].join(" "),
+      [
+        personnel.civilite,
+        personnel.nom,
+        personnel.prenom,
+        personnel.naissance || null,
+        personnel.pays || null,
+        tutelleId,
+        personnel.fonction || null,
+        personnel.arrivee || null,
+        personnel.depart || null,
+        uniqueUserId,
+        personnel.password,
+        typePersonneId
+      ]
+    );
+
+    await connection.query(
+      "INSERT INTO personnes_entites (personne_id, entite_id) VALUES (?, ?)",
+      [insertResult.insertId, entiteId]
+    );
+
+    await connection.commit();
+
+    return {
+      id: insertResult.insertId,
+      civilite: personnel.civilite,
+      nom: personnel.nom,
+      prenom: personnel.prenom,
+      fonction: personnel.fonction,
+      entite: personnel.entite,
+      userid: uniqueUserId,
+      password: personnel.password
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 function bucketTutelle(tutelle) {

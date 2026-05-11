@@ -126,3 +126,10 @@ export async function createUser(user) {
     body: JSON.stringify(user)
   });
 }
+
+export async function createPersonnel(personnel) {
+  return request("/api/admin/personnel", {
+    method: "POST",
+    body: JSON.stringify(personnel)
+  });
+}

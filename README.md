@@ -9,8 +9,8 @@ L'interface propose un tableau de bord RH, des pages de suivi de l'effectif, des
 ## Nouveautes 1.3 Beta
 
 - Navigation principale en onglets horizontaux, avec forme parallelogramme, contours blancs et espacement avec le contenu.
-- Acces `Administration` deplace dans la barre d'actions du haut pour les roles `admin` et `operateur`.
-- Page Administration pour creer des utilisateurs applicatifs avec role `beta`, `operateur` ou `admin`.
+- Acces administration disponible directement sur `/admin` pour les roles `admin` et `operateur`.
+- Page Administration organisee en modules `Utilisateurs`, `Personnel`, `Batiments` et `Plans`.
 - Persistance locale des utilisateurs ajoutes dans `server/data/users.store.json` ignore par Git.
 - Ajustements visuels du login, du layout principal, des panneaux RH et des KPI.
 - Deploiement valide sur Nginx avec frontend servi depuis `dist/` et proxy `/api/` vers le backend Node sur `3001`.

@@ -133,6 +133,19 @@ function normalizeCivilite(value) {
   return "";
 }
 
+function normalizeUpperText(value) {
+  return String(value ?? "").trim().toLocaleUpperCase("fr-FR");
+}
+
+function normalizePrenom(value) {
+  return String(value ?? "")
+    .trim()
+    .toLocaleLowerCase("fr-FR")
+    .replace(/(^|[\s'-])([\p{L}])/gu, (_match, separator, letter) =>
+      `${separator}${letter.toLocaleUpperCase("fr-FR")}`
+    );
+}
+
 app.use(express.json());
 
 app.get("/api/health", async (_request, response) => {
@@ -232,12 +245,12 @@ app.post(
   requireRole(["admin", "operateur"]),
   async (request, response) => {
     const civilite = normalizeCivilite(request.body?.civilite);
-    const nom = String(request.body?.nom ?? "").trim();
-    const prenom = String(request.body?.prenom ?? "").trim();
+    const nom = normalizeUpperText(request.body?.nom);
+    const prenom = normalizePrenom(request.body?.prenom);
     const naissance = normalizeDateInput(request.body?.naissance);
-    const pays = String(
+    const pays = normalizeUpperText(
       request.body?.paysLibre || request.body?.pays || ""
-    ).trim();
+    );
     const fonction = String(
       request.body?.fonctionLibre || request.body?.fonction || ""
     ).trim();

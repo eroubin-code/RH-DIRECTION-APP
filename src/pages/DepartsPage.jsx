@@ -29,6 +29,7 @@ export default function DepartsPage() {
       setRows(
         data.map((row) => ({
           ...row,
+          fonction: String(row.fonction ?? "").trim() || "Non renseignée",
           depart_raw: row.depart,
           depart: formatDateFr(row.depart)
         }))
@@ -39,6 +40,7 @@ export default function DepartsPage() {
   const columns = [
     { key: "nom", label: "Nom" },
     { key: "prenom", label: "Prénom" },
+    { key: "fonction", label: "Fonction" },
     { key: "depart", label: "Date départ" },
     { key: "entite", label: "Entité" },
     { key: "badge", label: "Badge" }

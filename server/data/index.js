@@ -437,19 +437,27 @@ async function readMysqlDeparts() {
   const rows = await queryRows(
     [
       "SELECT",
-      "  nom,",
-      "  prenom,",
-      "  depart,",
-      "  entite,",
-      "  badge,",
+      "  d.nom,",
+      "  d.prenom,",
+      "  COALESCE(p.fonction, '') AS fonction,",
+      "  d.depart,",
+      "  d.entite,",
+      "  d.badge,",
       "  CASE",
-      "    WHEN depart IS NULL THEN 'A completer'",
-      "    WHEN depart < CURDATE() THEN 'Verifier restitution badge'",
+      "    WHEN d.depart IS NULL THEN 'A completer'",
+      "    WHEN d.depart < CURDATE() THEN 'Verifier restitution badge'",
       "    ELSE 'Preparer sortie et desactivation badge'",
       "  END AS action_recommandee",
-      `FROM ${buildTableReference(appConfig.views.departs)}`,
-      "WHERE depart BETWEEN CURDATE() - INTERVAL 30 DAY AND CURDATE() + INTERVAL 30 DAY",
-      "ORDER BY depart ASC, nom ASC"
+      `FROM ${buildTableReference(appConfig.views.departs)} AS d`,
+      "LEFT JOIN personnes AS p",
+      "  ON p.nom = d.nom",
+      "  AND p.prenom = d.prenom",
+      "  AND (",
+      "    p.depart = d.depart",
+      "    OR (p.depart IS NULL AND d.depart IS NULL)",
+      "  )",
+      "WHERE d.depart BETWEEN CURDATE() - INTERVAL 30 DAY AND CURDATE() + INTERVAL 30 DAY",
+      "ORDER BY d.depart ASC, d.nom ASC"
     ].join(" ")
   );
 

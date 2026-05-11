@@ -83,6 +83,7 @@ export const rhData = {
       id: 1,
       nom: "Martin",
       prenom: "Claire",
+      fonction: "Ingenieure",
       depart: "2026-04-03",
       entite: "Plateforme Imagerie",
       badge: "B-1045"
@@ -91,6 +92,7 @@ export const rhData = {
       id: 2,
       nom: "Durand",
       prenom: "Paul",
+      fonction: "Technicien",
       depart: "2026-04-08",
       entite: "Administration",
       badge: "B-2021"
@@ -99,6 +101,7 @@ export const rhData = {
       id: 3,
       nom: "Petit",
       prenom: "Laura",
+      fonction: "Chercheuse",
       depart: "2026-04-22",
       entite: "Direction",
       badge: "B-1189"

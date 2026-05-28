@@ -77,7 +77,20 @@ function readString(name, fallbackValue) {
 export const appConfig = {
   port: readNumber("PORT", 3001),
   auth: {
-    salt: readString("RH_PASSWORD_SALT", "rh-direction-salt")
+    salt: readString("RH_PASSWORD_SALT", "rh-direction-salt"),
+    sessionTtlMs: readNumber("RH_SESSION_TTL_MS", 8 * 60 * 60 * 1000),
+    initialAdmin: {
+      username: readString("RH_INITIAL_ADMIN_USERNAME", ""),
+      password: readString("RH_INITIAL_ADMIN_PASSWORD", "")
+    },
+    login: {
+      windowMs: readNumber("RH_LOGIN_WINDOW_MS", 15 * 60 * 1000),
+      maxAttempts: readNumber("RH_LOGIN_MAX_ATTEMPTS", 5)
+    }
+  },
+  security: {
+    exposeHealthDetails: readBoolean("RH_HEALTH_DETAILS", false),
+    jsonLimit: readString("RH_JSON_LIMIT", "100kb")
   },
   dataSource: {
     mode: readString("RH_DATA_SOURCE", "mock"),

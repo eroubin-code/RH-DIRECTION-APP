@@ -6,3 +6,6 @@ dist/
 .env
 .env.local
 server/data/users.store.json
+.codex
+.agents/
+AGENTS.md

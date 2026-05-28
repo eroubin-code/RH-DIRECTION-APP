@@ -5,18 +5,16 @@ import {
   createPersonnel,
   getAnnualSnapshotReport,
   getDataStatus,
+  getPersonnelTypes,
   getRhDataset
 } from "./data/index.js";
-import { createUser, USER_ROLES, users } from "./data/users.js";
+import { createUser, hashPassword, USER_ROLES, users } from "./data/users.js";
 
 const app = express();
 const port = appConfig.port;
 const sessions = new Map();
-const PASSWORD_SALT = appConfig.auth.salt;
-
-function hashPassword(password) {
-  return crypto.scryptSync(password, PASSWORD_SALT, 64).toString("hex");
-}
+const loginAttempts = new Map();
+const SESSION_TTL_MS = appConfig.auth.sessionTtlMs;
 
 function sanitizeUser(user) {
   return {
@@ -38,6 +36,13 @@ function requireAuth(request, response, next) {
   }
 
   const session = sessions.get(token);
+
+  if (session.expiresAt <= Date.now()) {
+    sessions.delete(token);
+    response.status(401).json({ message: "Session expiree." });
+    return;
+  }
+
   request.user = session.user;
   request.token = token;
   next();
@@ -78,6 +83,10 @@ function buildPersonnelUserId(prenom, nom) {
     .map((part) => normalizeIdentifierPart(part).charAt(0))
     .join("");
   const normalizedNom = normalizeIdentifierPart(nom);
+
+  if (prenomInitials && normalizedNom) {
+    return `${prenomInitials}.${normalizedNom}`;
+  }
 
   return `${prenomInitials}${normalizedNom}` || "personne";
 }
@@ -146,30 +155,87 @@ function normalizePrenom(value) {
     );
 }
 
-app.use(express.json());
+function getLoginAttemptKey(request, username) {
+  const remoteAddress = request.ip ?? request.socket?.remoteAddress ?? "unknown";
+  return `${remoteAddress}:${String(username ?? "").toLocaleLowerCase()}`;
+}
+
+function getLoginAttempt(key) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(key);
+
+  if (!attempt || attempt.resetAt <= now) {
+    const freshAttempt = { count: 0, resetAt: now + appConfig.auth.login.windowMs };
+    loginAttempts.set(key, freshAttempt);
+    return freshAttempt;
+  }
+
+  return attempt;
+}
+
+function recordFailedLogin(key) {
+  const attempt = getLoginAttempt(key);
+  attempt.count += 1;
+}
+
+function clearLoginAttempt(key) {
+  loginAttempts.delete(key);
+}
+
+function sendServerError(response) {
+  response.status(500).json({ message: "Erreur serveur." });
+}
+
+app.use((_request, response, next) => {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "same-origin");
+  response.setHeader("Cache-Control", "no-store");
+  next();
+});
+
+app.use(express.json({ limit: appConfig.security.jsonLimit }));
 
 app.get("/api/health", async (_request, response) => {
   const dataStatus = await getDataStatus();
+  const publicDataStatus = appConfig.security.exposeHealthDetails
+    ? dataStatus
+    : {
+        mode: dataStatus.mode,
+        connected: dataStatus.connected
+      };
 
   response.json({
     status: "ok",
-    dataSource: dataStatus
+    dataSource: publicDataStatus
   });
 });
 
 app.post("/api/auth/login", (request, response) => {
   const { username, password } = request.body ?? {};
+  const attemptKey = getLoginAttemptKey(request, username);
+  const attempt = getLoginAttempt(attemptKey);
+
+  if (attempt.count >= appConfig.auth.login.maxAttempts) {
+    response.status(429).json({ message: "Trop de tentatives. Merci de reessayer plus tard." });
+    return;
+  }
+
   const user = users.find((entry) => entry.username === username);
 
   if (!user || hashPassword(password ?? "") !== user.passwordHash) {
+    recordFailedLogin(attemptKey);
     response.status(401).json({ message: "Identifiants invalides." });
     return;
   }
 
+  clearLoginAttempt(attemptKey);
+
   const token = crypto.randomBytes(24).toString("hex");
   sessions.set(token, {
     user: sanitizeUser(user),
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    expiresAt: Date.now() + SESSION_TTL_MS
   });
 
   response.json({
@@ -224,6 +290,11 @@ app.post(
       return;
     }
 
+    if (role === "admin" && request.user.role !== "admin") {
+      response.status(403).json({ message: "Seul un administrateur peut creer un administrateur." });
+      return;
+    }
+
     if (!isUsernameAvailable(username)) {
       response.status(409).json({ message: "Cet utilisateur existe deja." });
       return;
@@ -239,6 +310,19 @@ app.post(
   }
 );
 
+app.get(
+  "/api/admin/personnel/types",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  async (_request, response) => {
+    try {
+      response.json(await getPersonnelTypes());
+    } catch {
+      sendServerError(response);
+    }
+  }
+);
+
 app.post(
   "/api/admin/personnel",
   requireAuth,
@@ -251,9 +335,10 @@ app.post(
     const pays = normalizeUpperText(
       request.body?.paysLibre || request.body?.pays || ""
     );
-    const fonction = String(
+    const fonction = normalizeUpperText(
       request.body?.fonctionLibre || request.body?.fonction || ""
-    ).trim();
+    );
+    const typePersonne = String(request.body?.typePersonne ?? "").trim();
     const entite = String(request.body?.entite ?? "").trim();
     const tutelle = String(request.body?.tutelle ?? "").trim();
     const arrivee = normalizeDateInput(request.body?.arrivee);
@@ -293,6 +378,7 @@ app.post(
         naissance,
         pays,
         fonction,
+        typePersonne,
         entite,
         tutelle,
         arrivee,
@@ -301,9 +387,21 @@ app.post(
         password: generatePersonnelPassword()
       });
 
-      response.status(201).json(personnel);
+      response.status(201).json({
+        id: personnel.id,
+        civilite: personnel.civilite,
+        nom: personnel.nom,
+        prenom: personnel.prenom,
+        fonction: personnel.fonction,
+        typePersonne: personnel.typePersonne,
+        entite: personnel.entite,
+        userid: personnel.userid,
+        email: personnel.email
+      });
     } catch (error) {
-      response.status(500).json({ message: error.message });
+      const statusCode = error.message === "Entite introuvable." ? 400 : 500;
+      const message = statusCode === 400 ? error.message : "Erreur serveur.";
+      response.status(statusCode).json({ message });
     }
   }
 );
@@ -312,8 +410,8 @@ app.get("/api/dashboard", requireAuth, async (_request, response) => {
   try {
     const dataset = await getRhDataset();
     response.json(dataset.dashboard);
-  } catch (error) {
-    response.status(500).json({ message: error.message });
+  } catch {
+    sendServerError(response);
   }
 });
 
@@ -321,8 +419,8 @@ app.get("/api/effectif", requireAuth, async (_request, response) => {
   try {
     const dataset = await getRhDataset();
     response.json(dataset.effectif);
-  } catch (error) {
-    response.status(500).json({ message: error.message });
+  } catch {
+    sendServerError(response);
   }
 });
 
@@ -330,8 +428,8 @@ app.get("/api/departs", requireAuth, async (_request, response) => {
   try {
     const dataset = await getRhDataset();
     response.json(dataset.departs);
-  } catch (error) {
-    response.status(500).json({ message: error.message });
+  } catch {
+    sendServerError(response);
   }
 });
 
@@ -339,8 +437,8 @@ app.get("/api/badges", requireAuth, async (_request, response) => {
   try {
     const dataset = await getRhDataset();
     response.json(dataset.badges);
-  } catch (error) {
-    response.status(500).json({ message: error.message });
+  } catch {
+    sendServerError(response);
   }
 });
 
@@ -348,8 +446,8 @@ app.get("/api/entites", requireAuth, async (_request, response) => {
   try {
     const dataset = await getRhDataset();
     response.json(dataset.entites);
-  } catch (error) {
-    response.status(500).json({ message: error.message });
+  } catch {
+    sendServerError(response);
   }
 });
 
@@ -361,7 +459,8 @@ app.get("/api/statistiques/annuel", requireAuth, async (request, response) => {
   } catch (error) {
     const statusCode =
       error.message === "Date d'arrete invalide." ? 400 : 500;
-    response.status(statusCode).json({ message: error.message });
+    const message = statusCode === 400 ? error.message : "Erreur serveur.";
+    response.status(statusCode).json({ message });
   }
 });
 

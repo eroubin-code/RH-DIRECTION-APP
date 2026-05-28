@@ -54,15 +54,11 @@ Pour une session de test beta en reseau local depuis Windows :
 - frontend : `http://localhost:5173`
 - backend : `http://localhost:3001`
 
-Compte local par defaut :
+Compte initial :
 
-- utilisateur : `sysadm`
-- mot de passe : `Tp0sana`
-
-Compte beta local disponible si active pour les tests :
-
-- utilisateur : `Betauser`
-- mot de passe : `Betauser007`
+- aucun mot de passe par defaut n'est versionne ;
+- pour creer un administrateur initial sur un environnement vierge, definir `RH_INITIAL_ADMIN_USERNAME` et `RH_INITIAL_ADMIN_PASSWORD` dans `.env` avant le premier demarrage ;
+- les utilisateurs crees ensuite sont stockes dans `server/data/users.store.json`, ignore par Git.
 
 ## Structure
 

@@ -7,6 +7,7 @@ import {
   createUser,
   getEffectif,
   getEntites,
+  getPersonnelTypes,
   getUsers
 } from "../services/api";
 
@@ -22,14 +23,15 @@ const initialForm = {
   role: "beta"
 };
 
-export default function AdministrationPage() {
+export default function AdministrationPage({ currentUser }) {
   const [searchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [entites, setEntites] = useState([]);
   const [fonctions, setFonctions] = useState([]);
+  const [personnelTypes, setPersonnelTypes] = useState([]);
   const [tutelles, setTutelles] = useState([]);
   const [paysNaissance, setPaysNaissance] = useState([]);
-  const [isPersonnelPermanent, setIsPersonnelPermanent] = useState(true);
+  const [isPersonnelPermanent, setIsPersonnelPermanent] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -67,6 +69,7 @@ export default function AdministrationPage() {
             data
               .map((personnel) => String(personnel.fonction ?? "").trim())
               .filter(Boolean)
+              .map((fonction) => fonction.toLocaleUpperCase("fr-FR"))
           )
         ].sort((left, right) => left.localeCompare(right));
         const normalizedTutelles = [
@@ -88,6 +91,14 @@ export default function AdministrationPage() {
         setTutelles(normalizedTutelles);
         setPaysNaissance(normalizedPays);
       })
+      .catch((requestError) => {
+        setError(requestError.message);
+      });
+  }, []);
+
+  useEffect(() => {
+    getPersonnelTypes()
+      .then(setPersonnelTypes)
       .catch((requestError) => {
         setError(requestError.message);
       });
@@ -126,7 +137,8 @@ export default function AdministrationPage() {
     setError("");
     setMessage("");
 
-    const formData = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const formData = new FormData(formElement);
     const payload = {
       civilite: formData.get("civilite"),
       nom: formData.get("nom"),
@@ -136,6 +148,7 @@ export default function AdministrationPage() {
       paysLibre: formData.get("paysLibre"),
       fonction: formData.get("fonction"),
       fonctionLibre: formData.get("fonctionLibre"),
+      typePersonne: formData.get("typePersonne"),
       entite: formData.get("entite"),
       tutelle: formData.get("tutelle"),
       arrivee: formData.get("arrivee"),
@@ -145,10 +158,10 @@ export default function AdministrationPage() {
 
     try {
       const personnel = await createPersonnel(payload);
-      event.currentTarget.reset();
-      setIsPersonnelPermanent(true);
+      formElement?.reset?.();
+      setIsPersonnelPermanent(false);
       setMessage(
-        `Personnel ${personnel.prenom} ${personnel.nom} cree. Identifiant : ${personnel.userid}. Mot de passe : ${personnel.password}`
+        `Personnel ${personnel.prenom} ${personnel.nom} cree. Identifiant : ${personnel.userid}.`
       );
     } catch (requestError) {
       setError(requestError.message);
@@ -161,6 +174,10 @@ export default function AdministrationPage() {
     { key: "username", label: "Utilisateur" },
     { key: "role", label: "Role" }
   ];
+  const availableRoleOptions =
+    currentUser?.role === "admin"
+      ? ROLE_OPTIONS
+      : ROLE_OPTIONS.filter((role) => role.value !== "admin");
   const selectedSection = searchParams.get("section") ?? "utilisateurs";
   const activeSection = ["utilisateurs", "personnel", "batiments", "plans"].includes(
     selectedSection
@@ -213,7 +230,7 @@ export default function AdministrationPage() {
             <label className="admin-field">
               <span>Role</span>
               <select name="role" onChange={handleChange} value={form.role}>
-                {ROLE_OPTIONS.map((role) => (
+                {availableRoleOptions.map((role) => (
                   <option key={role.value} value={role.value}>
                     {role.label}
                   </option>
@@ -319,6 +336,20 @@ export default function AdministrationPage() {
                     type="text"
                   />
                   </div>
+                </label>
+                <label className="admin-field">
+                  <span>Type de personnel</span>
+                  <select defaultValue="employe" name="typePersonne" required>
+                    {personnelTypes.length > 0 ? (
+                      personnelTypes.map((typePersonne) => (
+                        <option key={typePersonne.id} value={typePersonne.nom}>
+                          {typePersonne.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="employe">Employe</option>
+                    )}
+                  </select>
                 </label>
                 <label className="admin-field">
                   <span>Entité</span>

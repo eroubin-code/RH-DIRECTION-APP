@@ -12,7 +12,7 @@ echo Projet  : %PROJECT_DIR%
 echo Mode    : mock
 echo URL     : http://%SANDBOX_IP%:5173
 echo Backend : http://%SANDBOX_IP%:3001
-echo Compte  : sysadm / Tp0sana
+echo Compte  : configurer RH_INITIAL_ADMIN_USERNAME et RH_INITIAL_ADMIN_PASSWORD si le store est vide
 echo ==========================================
 echo.
 

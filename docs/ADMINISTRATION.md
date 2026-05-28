@@ -33,6 +33,7 @@ Champs requis :
 - role : `beta`, `operateur` ou `admin`
 
 Le backend verifie que le nom utilisateur n'existe pas deja, sans tenir compte de la casse.
+Seul un utilisateur `admin` peut creer un autre utilisateur `admin`.
 
 ## Personnel et plans
 
@@ -40,19 +41,18 @@ L'onglet `Personnel` permet de preparer la creation d'une personne dans la base 
 
 Lors de la creation :
 
-- `userid` est genere avec les premieres lettres du prenom, ou de chaque prenom compose, suivies du nom complet normalise.
+- `userid` est genere avec les premieres lettres du prenom, ou de chaque prenom compose, suivies d'un point et du nom complet normalise.
 - `mdp` est genere automatiquement sur 8 caracteres avec au moins une majuscule, un chiffre et un caractere special.
+- le mot de passe genere n'est pas renvoye par l'API afin d'eviter son exposition dans l'interface.
 - la personne est inseree dans `personnes`, puis rattachee a l'entite choisie via `personnes_entites`.
+- `typesPersonne_id` est renseigne avec le type selectionne dans le formulaire.
+- une adresse est creee dans `messagerie` au format `userid@iecb.u-bordeaux.fr`, sauf si la fonction est `Stagiaire`.
 
 Les onglets `Batiments` et `Plans` preparent les prochains modules d'administration. Les ecritures en base seront ajoutees apres validation du modele de donnees.
 
 ## Stockage
 
-Les utilisateurs initiaux sont definis dans :
-
-```text
-server/data/users.js
-```
+Un administrateur initial peut etre fourni par les variables `RH_INITIAL_ADMIN_USERNAME` et `RH_INITIAL_ADMIN_PASSWORD` lorsque `server/data/users.store.json` n'existe pas encore.
 
 Les utilisateurs crees depuis l'interface sont stockes localement dans :
 
@@ -80,7 +80,7 @@ Content-Type: application/json
 
 {
   "username": "nouvel.utilisateur",
-  "password": "secret123",
+  "password": "<mot-de-passe-a-definir>",
   "role": "beta"
 }
 ```
@@ -92,4 +92,5 @@ Content-Type: application/json
 - `Le nom utilisateur doit contenir au moins 3 caracteres.`
 - `Le mot de passe doit contenir au moins 6 caracteres.`
 - `Role utilisateur invalide.`
+- `Seul un administrateur peut creer un administrateur.`
 - `Cet utilisateur existe deja.`

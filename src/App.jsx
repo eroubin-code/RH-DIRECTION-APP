@@ -1,11 +1,10 @@
-// test codex local
 // Compose la structure principale de l'application et declare les routes RH.
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import BrandLogo from "./components/BrandLogo";
-import { getCurrentUser, login, logout } from "./services/api";
+import { AUTH_EXPIRED_EVENT, getCurrentUser, login, logout } from "./services/api";
 
 import Dashboard from "./pages/Dashboard";
 import StatistiquePage from "./pages/StatistiquePage";
@@ -48,6 +47,20 @@ export default function App() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleAuthExpired() {
+      setCurrentUser(null);
+      setForm({ username: "", password: "" });
+      setError("Session expiree. Merci de vous reconnecter.");
+    }
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
     };
   }, []);
 
@@ -176,7 +189,7 @@ export default function App() {
               path="/admin"
               element={
                 ADMIN_ROLES.includes(currentUser.role) ? (
-                  <AdministrationPage />
+                  <AdministrationPage currentUser={currentUser} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

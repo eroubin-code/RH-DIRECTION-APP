@@ -1,5 +1,6 @@
 // Service frontend pour dialoguer avec le backend local RH.
 const AUTH_TOKEN_KEY = "rh-auth-token";
+export const AUTH_EXPIRED_EVENT = "rh-auth-expired";
 
 function getStoredToken() {
   return window.localStorage.getItem(AUTH_TOKEN_KEY);
@@ -37,6 +38,12 @@ async function request(path, options = {}) {
       message = payload.message ?? message;
     } catch {
       // Ignore les erreurs de parsing pour conserver le message par defaut.
+    }
+
+    if (response.status === 401 && token) {
+      clearStoredToken();
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+      message = "Session expiree. Merci de vous reconnecter.";
     }
 
     throw new Error(message);
@@ -118,6 +125,10 @@ export async function getAnnualStatistics(date) {
 
 export async function getUsers() {
   return request("/api/admin/users");
+}
+
+export async function getPersonnelTypes() {
+  return request("/api/admin/personnel/types");
 }
 
 export async function createUser(user) {

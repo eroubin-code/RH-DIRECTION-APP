@@ -24,7 +24,7 @@ echo "Projet  : $PROJECT_DIR"
 echo "Mode    : mock"
 echo "URL     : http://127.0.0.1:5173"
 echo "Backend : http://127.0.0.1:3001"
-echo "Compte  : sysadm / Tp0sana"
+echo "Compte  : configurer RH_INITIAL_ADMIN_USERNAME et RH_INITIAL_ADMIN_PASSWORD si le store est vide"
 echo "=========================================="
 echo
 

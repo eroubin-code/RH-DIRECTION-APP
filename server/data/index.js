@@ -3,6 +3,7 @@ import { rhData } from "./rhData.js";
 
 let mysqlPromiseModule = null;
 let pool = null;
+const IECB_MAIL_DOMAIN = "iecb.u-bordeaux.fr";
 
 function normalizeRows(rows) {
   return rows.map((row) =>
@@ -67,6 +68,15 @@ function inferSex(civilite) {
   }
 
   return "Non renseigne";
+}
+
+function isStagiaireFunction(fonction) {
+  return String(fonction ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .includes("stagiaire");
 }
 
 function inferStatus(fonction, typePersonne) {
@@ -174,7 +184,26 @@ async function getUniquePersonUserId(connection, preferredUserId) {
   }
 }
 
-async function findTypePersonneId(connection) {
+async function findTypePersonneId(connection, typePersonne) {
+  const normalizedTypePersonne = String(typePersonne ?? "").trim();
+
+  if (normalizedTypePersonne) {
+    const [selectedRows] = await connection.query(
+      [
+        "SELECT id",
+        "FROM typesPersonnes",
+        "WHERE nom = ? OR description = ? OR id = ?",
+        "ORDER BY id",
+        "LIMIT 1"
+      ].join(" "),
+      [normalizedTypePersonne, normalizedTypePersonne, normalizedTypePersonne]
+    );
+
+    if (selectedRows[0]?.id) {
+      return selectedRows[0].id;
+    }
+  }
+
   const [rows] = await connection.query(
     [
       "SELECT id",
@@ -186,6 +215,23 @@ async function findTypePersonneId(connection) {
   );
 
   return rows[0]?.id ?? 1;
+}
+
+export async function getPersonnelTypes() {
+  if (appConfig.dataSource.mode !== "mysql") {
+    return [];
+  }
+
+  return queryRows(
+    [
+      "SELECT",
+      "  id,",
+      "  nom,",
+      "  COALESCE(NULLIF(description, ''), nom) AS label",
+      "FROM typesPersonnes",
+      "ORDER BY id"
+    ].join(" ")
+  );
 }
 
 async function findTutelleId(connection, tutelle) {
@@ -234,7 +280,10 @@ export async function createPersonnel(personnel) {
   try {
     await connection.beginTransaction();
 
-    const typePersonneId = await findTypePersonneId(connection);
+    const typePersonneId = await findTypePersonneId(
+      connection,
+      personnel.typePersonne
+    );
     const tutelleId = await findTutelleId(connection, personnel.tutelle);
     const entiteId = await findEntiteId(connection, personnel.entite);
     const uniqueUserId = await getUniquePersonUserId(connection, personnel.userid);
@@ -274,6 +323,21 @@ export async function createPersonnel(personnel) {
       [insertResult.insertId, entiteId]
     );
 
+    const email = isStagiaireFunction(personnel.fonction)
+      ? null
+      : `${uniqueUserId}@${IECB_MAIL_DOMAIN}`;
+
+    if (email) {
+      await connection.query(
+        [
+          "INSERT INTO messagerie",
+          "(personne_id, email, alias, redirection, fin, typesMessagerie_id)",
+          "VALUES (?, ?, NULL, NULL, NULL, NULL)"
+        ].join(" "),
+        [insertResult.insertId, email]
+      );
+    }
+
     await connection.commit();
 
     return {
@@ -282,9 +346,10 @@ export async function createPersonnel(personnel) {
       nom: personnel.nom,
       prenom: personnel.prenom,
       fonction: personnel.fonction,
+      typePersonne: personnel.typePersonne,
       entite: personnel.entite,
       userid: uniqueUserId,
-      password: personnel.password
+      email
     };
   } catch (error) {
     await connection.rollback();

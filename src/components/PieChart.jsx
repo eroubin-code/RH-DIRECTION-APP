@@ -51,8 +51,26 @@ export default function PieChart({
     }));
   const total = legendItems.reduce((sum, item) => sum + Number(item.count ?? 0), 0);
   const visibleItems = legendItems.filter((item) => Number(item.count ?? 0) > 0);
+  const chartSegments = visibleItems.reduce(
+    (segments, item) => {
+      const startAngle = segments.nextStartAngle;
+      const sweep = (Number(item.count) / total) * 360;
+      const endAngle = startAngle + sweep;
 
-  let startAngle = 0;
+      return {
+        nextStartAngle: endAngle,
+        items: [
+          ...segments.items,
+          {
+            ...item,
+            startAngle,
+            path: describeArc(110, 110, 86, startAngle, endAngle)
+          }
+        ]
+      };
+    },
+    { nextStartAngle: 0, items: [] }
+  ).items;
 
   return (
     <section className="stats-panel">
@@ -74,24 +92,15 @@ export default function PieChart({
                 r="86"
               />
 
-              {visibleItems.map((item) => {
-                const sweep = (Number(item.count) / total) * 360;
-                const endAngle = startAngle + sweep;
-                const path = describeArc(110, 110, 86, startAngle, endAngle);
-                const currentStartAngle = startAngle;
-
-                startAngle = endAngle;
-
-                return (
-                  <path
-                    key={`${item.label}-${currentStartAngle}`}
-                    d={path}
-                    fill={item.color}
-                    stroke="#f8fbfe"
-                    strokeWidth="3"
-                  />
-                );
-              })}
+              {chartSegments.map((item) => (
+                <path
+                  key={`${item.label}-${item.startAngle}`}
+                  d={item.path}
+                  fill={item.color}
+                  stroke="#f8fbfe"
+                  strokeWidth="3"
+                />
+              ))}
 
               <circle cx="110" cy="110" fill="#ffffff" r="52" />
               <text

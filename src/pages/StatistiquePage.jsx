@@ -4,39 +4,6 @@ import { getAnnualStatistics } from "../services/api";
 
 const DEFAULT_SNAPSHOT_DATE = new Date().toISOString().slice(0, 10);
 
-function normalizeFunctionBucket(fonction) {
-  const normalizedFunction = String(fonction ?? "").trim().toLowerCase();
-
-  if (normalizedFunction.includes("post")) {
-    return "Post-docs";
-  }
-
-  if (normalizedFunction.includes("doctorant")) {
-    return "Doctorants";
-  }
-
-  if (normalizedFunction.includes("stagiaire")) {
-    return "Stagiaires";
-  }
-
-  return "Autres";
-}
-
-function normalizeNationality(value) {
-  return String(value ?? "").trim() || "Non renseignee";
-}
-
-function normalizeTutelle(value) {
-  const normalizedValue = String(value ?? "").trim();
-  const loweredValue = normalizedValue.toLowerCase();
-
-  if (!normalizedValue || loweredValue === "non renseignee" || loweredValue === "iecb") {
-    return "Autre";
-  }
-
-  return normalizedValue;
-}
-
 function formatDateLabel(value) {
   const normalizedValue = String(value ?? "").trim();
 
@@ -184,10 +151,11 @@ export default function StatistiquePage() {
         <div className="stats-actions">
           <button
             className="effectif-reset stats-export-button"
+            disabled={isLoading}
             onClick={handleExport}
             type="button"
           >
-            Export CSV
+            {isLoading ? "Chargement..." : "Export CSV"}
           </button>
         </div>
       </div>

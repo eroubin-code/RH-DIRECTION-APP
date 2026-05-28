@@ -10,6 +10,13 @@ Exemple minimal :
 PORT=3001
 RH_DATA_SOURCE=mysql
 RH_PASSWORD_SALT=rh-direction-salt
+RH_JSON_LIMIT=100kb
+RH_SESSION_TTL_MS=28800000
+RH_LOGIN_WINDOW_MS=900000
+RH_LOGIN_MAX_ATTEMPTS=5
+RH_HEALTH_DETAILS=false
+RH_INITIAL_ADMIN_USERNAME=
+RH_INITIAL_ADMIN_PASSWORD=
 
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
@@ -45,6 +52,13 @@ Le backend interroge MySQL via `mysql2`.
 
 - `PORT` : port du backend Express, par defaut `3001`.
 - `RH_PASSWORD_SALT` : sel utilise pour verifier les mots de passe scrypt.
+- `RH_JSON_LIMIT` : limite de taille des corps JSON Express, par defaut `100kb`.
+- `RH_SESSION_TTL_MS` : duree de validite des sessions en memoire, par defaut 8 heures.
+- `RH_LOGIN_WINDOW_MS` : fenetre de limitation des tentatives de connexion, par defaut 15 minutes.
+- `RH_LOGIN_MAX_ATTEMPTS` : nombre maximum d'echecs de connexion par fenetre, par defaut `5`.
+- `RH_HEALTH_DETAILS` : expose les details MySQL dans `/api/health` si `true`; garder `false` en production.
+- `RH_INITIAL_ADMIN_USERNAME` : identifiant admin initial optionnel si aucun store utilisateur n'existe.
+- `RH_INITIAL_ADMIN_PASSWORD` : mot de passe admin initial optionnel, a garder hors Git.
 - `RH_DATA_SOURCE` : `mock` ou `mysql`.
 - `MYSQL_HOST` : hote MySQL.
 - `MYSQL_PORT` : port MySQL.
@@ -71,4 +85,4 @@ Le backend interroge MySQL via `mysql2`.
 curl -s http://127.0.0.1:3001/api/health
 ```
 
-La reponse expose le mode de donnees, l'etat de connexion MySQL et les vues configurees.
+La reponse expose par defaut uniquement le mode de donnees et l'etat de connexion. Les details MySQL ne sont visibles que si `RH_HEALTH_DETAILS=true`.

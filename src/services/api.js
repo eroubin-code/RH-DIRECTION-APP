@@ -138,6 +138,13 @@ export async function createUser(user) {
   });
 }
 
+export async function resetUserPassword(userId, password) {
+  return request(`/api/admin/users/${userId}/password`, {
+    method: "PATCH",
+    body: JSON.stringify({ password })
+  });
+}
+
 export async function createPersonnel(personnel) {
   return request("/api/admin/personnel", {
     method: "POST",

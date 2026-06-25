@@ -65,3 +65,16 @@ export function createUser({ username, passwordHash, role }) {
 
   return user;
 }
+
+export function updateUserPassword(userId, passwordHash) {
+  const user = users.find((entry) => String(entry.id) === String(userId));
+
+  if (!user) {
+    return null;
+  }
+
+  user.passwordHash = passwordHash;
+  saveUsers();
+
+  return user;
+}

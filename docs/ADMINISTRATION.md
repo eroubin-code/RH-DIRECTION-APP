@@ -35,6 +35,20 @@ Champs requis :
 Le backend verifie que le nom utilisateur n'existe pas deja, sans tenir compte de la casse.
 Seul un utilisateur `admin` peut creer un autre utilisateur `admin`.
 
+## Reinitialisation d'un mot de passe
+
+La page `Utilisateurs` permet de definir un nouveau mot de passe pour un compte existant en cas de perte.
+
+Champs requis :
+
+- utilisateur concerne
+- nouveau mot de passe : au moins 6 caracteres
+- confirmation identique au nouveau mot de passe
+
+Les roles `admin` et `operateur` peuvent reinitialiser un mot de passe.
+Seul un utilisateur `admin` peut modifier le mot de passe d'un autre compte `admin`.
+Apres modification, les autres sessions ouvertes pour l'utilisateur concerne sont fermees.
+
 ## Personnel et plans
 
 L'onglet `Personnel` permet de preparer la creation d'une personne dans la base RH.
@@ -85,6 +99,18 @@ Content-Type: application/json
 }
 ```
 
+Reinitialiser un mot de passe :
+
+```http
+PATCH /api/admin/users/:id/password
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "password": "<nouveau-mot-de-passe>"
+}
+```
+
 ## Messages d'erreur
 
 - `Authentification requise.` : token absent ou invalide.
@@ -93,4 +119,6 @@ Content-Type: application/json
 - `Le mot de passe doit contenir au moins 6 caracteres.`
 - `Role utilisateur invalide.`
 - `Seul un administrateur peut creer un administrateur.`
+- `Seul un administrateur peut modifier le mot de passe d'un administrateur.`
 - `Cet utilisateur existe deja.`
+- `Utilisateur introuvable.`

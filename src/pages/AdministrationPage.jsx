@@ -8,7 +8,8 @@ import {
   getEffectif,
   getEntites,
   getPersonnelTypes,
-  getUsers
+  getUsers,
+  resetUserPassword
 } from "../services/api";
 
 const ROLE_OPTIONS = [
@@ -23,6 +24,12 @@ const initialForm = {
   role: "beta"
 };
 
+const initialPasswordResetForm = {
+  userId: "",
+  password: "",
+  confirmation: ""
+};
+
 export default function AdministrationPage({ currentUser }) {
   const [searchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
@@ -33,12 +40,17 @@ export default function AdministrationPage({ currentUser }) {
   const [paysNaissance, setPaysNaissance] = useState([]);
   const [isPersonnelPermanent, setIsPersonnelPermanent] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [passwordResetForm, setPasswordResetForm] = useState(initialPasswordResetForm);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedbackTarget, setFeedbackTarget] = useState("");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isCreatingPersonnel, setIsCreatingPersonnel] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
     getUsers().then(setUsers).catch((requestError) => {
+      setFeedbackTarget("page");
       setError(requestError.message);
     });
   }, []);
@@ -57,6 +69,7 @@ export default function AdministrationPage({ currentUser }) {
         setEntites(normalizedEntites);
       })
       .catch((requestError) => {
+        setFeedbackTarget("page");
         setError(requestError.message);
       });
   }, []);
@@ -92,6 +105,7 @@ export default function AdministrationPage({ currentUser }) {
         setPaysNaissance(normalizedPays);
       })
       .catch((requestError) => {
+        setFeedbackTarget("page");
         setError(requestError.message);
       });
   }, []);
@@ -100,6 +114,7 @@ export default function AdministrationPage({ currentUser }) {
     getPersonnelTypes()
       .then(setPersonnelTypes)
       .catch((requestError) => {
+        setFeedbackTarget("page");
         setError(requestError.message);
       });
   }, []);
@@ -113,9 +128,19 @@ export default function AdministrationPage({ currentUser }) {
     }));
   }
 
+  function handlePasswordResetChange(event) {
+    const { name, value } = event.target;
+
+    setPasswordResetForm((previous) => ({
+      ...previous,
+      [name]: value
+    }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
-    setIsSubmitting(true);
+    setIsCreatingUser(true);
+    setFeedbackTarget("user");
     setError("");
     setMessage("");
 
@@ -127,13 +152,41 @@ export default function AdministrationPage({ currentUser }) {
     } catch (requestError) {
       setError(requestError.message);
     } finally {
-      setIsSubmitting(false);
+      setIsCreatingUser(false);
+    }
+  }
+
+  async function handlePasswordResetSubmit(event) {
+    event.preventDefault();
+    setIsResettingPassword(true);
+    setFeedbackTarget("password");
+    setError("");
+    setMessage("");
+
+    if (passwordResetForm.password !== passwordResetForm.confirmation) {
+      setError("Les deux mots de passe ne correspondent pas.");
+      setIsResettingPassword(false);
+      return;
+    }
+
+    try {
+      const user = await resetUserPassword(
+        passwordResetForm.userId,
+        passwordResetForm.password
+      );
+      setPasswordResetForm(initialPasswordResetForm);
+      setMessage(`Mot de passe de ${user.username} modifie.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsResettingPassword(false);
     }
   }
 
   async function handlePersonnelSubmit(event) {
     event.preventDefault();
-    setIsSubmitting(true);
+    setIsCreatingPersonnel(true);
+    setFeedbackTarget("personnel");
     setError("");
     setMessage("");
 
@@ -166,7 +219,7 @@ export default function AdministrationPage({ currentUser }) {
     } catch (requestError) {
       setError(requestError.message);
     } finally {
-      setIsSubmitting(false);
+      setIsCreatingPersonnel(false);
     }
   }
 
@@ -178,6 +231,10 @@ export default function AdministrationPage({ currentUser }) {
     currentUser?.role === "admin"
       ? ROLE_OPTIONS
       : ROLE_OPTIONS.filter((role) => role.value !== "admin");
+  const resettableUsers =
+    currentUser?.role === "admin"
+      ? users
+      : users.filter((user) => user.role !== "admin");
   const selectedSection = searchParams.get("section") ?? "utilisateurs";
   const activeSection = ["utilisateurs", "personnel", "batiments", "plans"].includes(
     selectedSection
@@ -193,6 +250,10 @@ export default function AdministrationPage({ currentUser }) {
           Visualiser les stats
         </Link>
       </div>
+
+      {feedbackTarget === "page" && error ? (
+        <p className="admin-feedback error">{error}</p>
+      ) : null}
 
       {activeSection === "utilisateurs" ? (
         <div className="admin-layout">
@@ -238,19 +299,93 @@ export default function AdministrationPage({ currentUser }) {
               </select>
             </label>
 
-            {error ? <p className="admin-feedback error">{error}</p> : null}
-            {message ? <p className="admin-feedback success">{message}</p> : null}
+            {feedbackTarget === "user" && error ? (
+              <p className="admin-feedback error">{error}</p>
+            ) : null}
+            {feedbackTarget === "user" && message ? (
+              <p className="admin-feedback success">{message}</p>
+            ) : null}
 
-            <button className="btn-primary admin-submit" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Creation..." : "Créer"}
+            <button className="btn-primary admin-submit" disabled={isCreatingUser} type="submit">
+              {isCreatingUser ? "Creation..." : "Créer"}
             </button>
           </form>
 
           <div className="admin-users">
-            <div className="admin-form-header">
-              <h4>Utilisateurs du site</h4>
+            <div className="admin-users-list">
+              <div className="admin-form-header">
+                <h4>Utilisateurs du site</h4>
+              </div>
+              <DataTable columns={columns} data={users} />
             </div>
-            <DataTable columns={columns} data={users} />
+
+            <form className="admin-form admin-password-form" onSubmit={handlePasswordResetSubmit}>
+              <div className="admin-form-header">
+                <h4>Réinitialiser un mot de passe</h4>
+              </div>
+
+              <label className="admin-field">
+                <span>Utilisateur</span>
+                <select
+                  name="userId"
+                  onChange={handlePasswordResetChange}
+                  required
+                  value={passwordResetForm.userId}
+                >
+                  <option value="" disabled>
+                    Sélectionner un utilisateur
+                  </option>
+                  {resettableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.username} ({user.role})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="admin-form-grid compact">
+                <label className="admin-field">
+                  <span>Nouveau mot de passe</span>
+                  <input
+                    autoComplete="new-password"
+                    minLength="6"
+                    name="password"
+                    onChange={handlePasswordResetChange}
+                    required
+                    type="password"
+                    value={passwordResetForm.password}
+                  />
+                </label>
+
+                <label className="admin-field">
+                  <span>Confirmation</span>
+                  <input
+                    autoComplete="new-password"
+                    minLength="6"
+                    name="confirmation"
+                    onChange={handlePasswordResetChange}
+                    required
+                    type="password"
+                    value={passwordResetForm.confirmation}
+                  />
+                </label>
+              </div>
+
+              {feedbackTarget === "password" && error ? (
+                <p className="admin-feedback error">{error}</p>
+              ) : null}
+              {feedbackTarget === "password" && message ? (
+                <p className="admin-feedback success">{message}</p>
+              ) : null}
+
+              <button
+                className="btn-primary admin-submit"
+                disabled={isResettingPassword}
+                type="submit"
+              >
+                {isResettingPassword ? "Modification..." : "Modifier le mot de passe"}
+              </button>
+            </form>
           </div>
         </div>
       ) : null}
@@ -413,11 +548,19 @@ export default function AdministrationPage({ currentUser }) {
               </div>
             </div>
 
-            {error ? <p className="admin-feedback error">{error}</p> : null}
-            {message ? <p className="admin-feedback success">{message}</p> : null}
+            {feedbackTarget === "personnel" && error ? (
+              <p className="admin-feedback error">{error}</p>
+            ) : null}
+            {feedbackTarget === "personnel" && message ? (
+              <p className="admin-feedback success">{message}</p>
+            ) : null}
 
-            <button className="btn-primary admin-submit" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Creation..." : "Créer"}
+            <button
+              className="btn-primary admin-submit"
+              disabled={isCreatingPersonnel}
+              type="submit"
+            >
+              {isCreatingPersonnel ? "Creation..." : "Créer"}
             </button>
           </form>
         </div>

@@ -8,7 +8,13 @@ import {
   getPersonnelTypes,
   getRhDataset
 } from "./data/index.js";
-import { createUser, hashPassword, USER_ROLES, users } from "./data/users.js";
+import {
+  createUser,
+  hashPassword,
+  updateUserPassword,
+  USER_ROLES,
+  users
+} from "./data/users.js";
 
 const app = express();
 const port = appConfig.port;
@@ -182,6 +188,14 @@ function clearLoginAttempt(key) {
   loginAttempts.delete(key);
 }
 
+function revokeUserSessions(userId, exceptToken = null) {
+  for (const [token, session] of sessions.entries()) {
+    if (token !== exceptToken && Number(session.user?.id) === Number(userId)) {
+      sessions.delete(token);
+    }
+  }
+}
+
 function sendServerError(response) {
   response.status(500).json({ message: "Erreur serveur." });
 }
@@ -307,6 +321,41 @@ app.post(
     });
 
     response.status(201).json(sanitizeUser(user));
+  }
+);
+
+app.patch(
+  "/api/admin/users/:id/password",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (request, response) => {
+    const userId = Number(request.params.id);
+    const password = String(request.body?.password ?? "");
+    const targetUser = users.find((entry) => Number(entry.id) === userId);
+
+    if (!targetUser) {
+      response.status(404).json({ message: "Utilisateur introuvable." });
+      return;
+    }
+
+    if (password.length < 6) {
+      response
+        .status(400)
+        .json({ message: "Le mot de passe doit contenir au moins 6 caracteres." });
+      return;
+    }
+
+    if (targetUser.role === "admin" && request.user.role !== "admin") {
+      response.status(403).json({
+        message: "Seul un administrateur peut modifier le mot de passe d'un administrateur."
+      });
+      return;
+    }
+
+    const user = updateUserPassword(userId, hashPassword(password));
+    revokeUserSessions(user.id, request.token);
+
+    response.json(sanitizeUser(user));
   }
 );
 

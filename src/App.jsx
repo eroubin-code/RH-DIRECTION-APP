@@ -1,6 +1,6 @@
 // Compose la structure principale de l'application et declare les routes RH.
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import BrandLogo from "./components/BrandLogo";
@@ -132,6 +132,11 @@ export default function App() {
               <p className="login-eyebrow">Acces interne temporaire</p>
               <h1 className="login-title">RH Direction App</h1>
               <p className="login-text">Tableau de bord accessible sans authentification</p>
+            </div>
+            <div className="public-dashboard-actions">
+              <Link className="effectif-reset public-dashboard-login" to="/admin">
+                Connexion administration
+              </Link>
             </div>
             <Dashboard publicMode />
           </section>

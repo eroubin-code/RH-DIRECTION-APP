@@ -1967,6 +1967,16 @@
   padding: 0;
 }
 
+.public-dashboard-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+
+.public-dashboard-login {
+  text-decoration: none;
+}
+
 @media (max-width: 1180px) {
   .main-area {
     grid-template-columns: 240px minmax(0, 1fr);

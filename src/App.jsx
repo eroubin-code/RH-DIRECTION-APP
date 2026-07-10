@@ -121,7 +121,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    if (location.pathname === "/dashboard") {
+    if (location.pathname === "/" || location.pathname === "/dashboard") {
       return (
         <main className="login-shell">
           <section className="login-card public-dashboard-shell">

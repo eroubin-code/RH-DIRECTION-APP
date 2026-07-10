@@ -68,6 +68,10 @@ export default function App() {
   function handleChange(event) {
     const { name, value } = event.target;
 
+    if (error) {
+      setError("");
+    }
+
     setForm((previous) => ({
       ...previous,
       [name]: value

@@ -147,5 +147,8 @@ export const appConfig = {
     fromName: readString("RH_AWARENESS_FROM_NAME", "Communication RH"),
     replyTo: readString("RH_AWARENESS_REPLY_TO", "communication-rh@iecb.fr"),
     provider: readString("RH_AWARENESS_PROVIDER", "preview")
+  },
+  publicDashboard: {
+    enabled: readBoolean("RH_PUBLIC_DASHBOARD_ENABLED", false)
   }
 };

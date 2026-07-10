@@ -292,6 +292,50 @@ function sendDownload(response, filename, contentType, body) {
   response.status(200).send(body);
 }
 
+function isPrivateDashboardRequest(request) {
+  const remoteAddress = String(
+    request.ip ?? request.socket?.remoteAddress ?? ""
+  ).toLowerCase();
+
+  return (
+    remoteAddress === "::1" ||
+    remoteAddress === "127.0.0.1" ||
+    remoteAddress.startsWith("::ffff:127.") ||
+    remoteAddress.startsWith("172.16.") ||
+    remoteAddress.startsWith("172.17.") ||
+    remoteAddress.startsWith("172.18.") ||
+    remoteAddress.startsWith("172.19.") ||
+    remoteAddress.startsWith("172.20.") ||
+    remoteAddress.startsWith("172.21.") ||
+    remoteAddress.startsWith("172.22.") ||
+    remoteAddress.startsWith("172.23.") ||
+    remoteAddress.startsWith("172.24.") ||
+    remoteAddress.startsWith("172.25.") ||
+    remoteAddress.startsWith("172.26.") ||
+    remoteAddress.startsWith("172.27.") ||
+    remoteAddress.startsWith("172.28.") ||
+    remoteAddress.startsWith("172.29.") ||
+    remoteAddress.startsWith("172.30.") ||
+    remoteAddress.startsWith("172.31.") ||
+    remoteAddress.startsWith("::ffff:172.16.") ||
+    remoteAddress.startsWith("::ffff:172.17.") ||
+    remoteAddress.startsWith("::ffff:172.18.") ||
+    remoteAddress.startsWith("::ffff:172.19.") ||
+    remoteAddress.startsWith("::ffff:172.20.") ||
+    remoteAddress.startsWith("::ffff:172.21.") ||
+    remoteAddress.startsWith("::ffff:172.22.") ||
+    remoteAddress.startsWith("::ffff:172.23.") ||
+    remoteAddress.startsWith("::ffff:172.24.") ||
+    remoteAddress.startsWith("::ffff:172.25.") ||
+    remoteAddress.startsWith("::ffff:172.26.") ||
+    remoteAddress.startsWith("::ffff:172.27.") ||
+    remoteAddress.startsWith("::ffff:172.28.") ||
+    remoteAddress.startsWith("::ffff:172.29.") ||
+    remoteAddress.startsWith("::ffff:172.30.") ||
+    remoteAddress.startsWith("::ffff:172.31.")
+  );
+}
+
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("X-Frame-Options", "DENY");
@@ -554,6 +598,20 @@ app.post(
 );
 
 app.get("/api/dashboard", requireAuth, async (_request, response) => {
+  try {
+    const dataset = await getRhDataset();
+    response.json(dataset.dashboard);
+  } catch {
+    sendServerError(response);
+  }
+});
+
+app.get("/api/public/dashboard", async (request, response) => {
+  if (!appConfig.publicDashboard.enabled || !isPrivateDashboardRequest(request)) {
+    response.status(403).json({ message: "Acces public non autorise." });
+    return;
+  }
+
   try {
     const dataset = await getRhDataset();
     response.json(dataset.dashboard);

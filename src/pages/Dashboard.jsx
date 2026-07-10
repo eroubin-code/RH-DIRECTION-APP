@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
-import { getDashboardData } from "../services/api";
+import { getDashboardData, getPublicDashboardData } from "../services/api";
 
 function formatTeamLabel(value) {
   const normalizedValue = String(value ?? "").trim().toLowerCase();
@@ -14,6 +14,8 @@ function formatTeamLabel(value) {
 }
 
 function MetricList({ title, items, emptyLabel = "Aucune donnee disponible" }) {
+  const isAlertPanel = title.toLocaleLowerCase("fr-FR").includes("alerte");
+
   return (
     <section className="content-card rh-panel dashboard-panel">
       <div className="section-title">
@@ -23,8 +25,14 @@ function MetricList({ title, items, emptyLabel = "Aucune donnee disponible" }) {
       <div className="dashboard-list">
         {items.length > 0 ? (
           items.map((item) => (
-            <div className="dashboard-list-row" key={item.label}>
-              <span>{item.label}</span>
+            <div
+              className={isAlertPanel ? "dashboard-list-row alert-row" : "dashboard-list-row"}
+              key={item.label}
+            >
+              <span>
+                {isAlertPanel ? <i aria-hidden="true" /> : null}
+                {item.label}
+              </span>
               <strong>{item.value}</strong>
             </div>
           ))
@@ -87,7 +95,7 @@ function QuickBreakdown({
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ publicMode = false }) {
   const [data, setData] = useState({
     kpis: [],
     recentDeparts: [],
@@ -100,8 +108,9 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    getDashboardData().then(setData);
-  }, []);
+    const loader = publicMode ? getPublicDashboardData : getDashboardData;
+    loader().then(setData);
+  }, [publicMode]);
 
   const assignmentDetailsByLabel = Object.fromEntries(
     (Array.isArray(data.assignmentGroups) ? data.assignmentGroups : []).map((group) => [
@@ -122,6 +131,16 @@ export default function Dashboard() {
 
   return (
     <div className="page-section rh-section">
+      <section className="dashboard-hero">
+        <div>
+          <p className="dashboard-eyebrow">Centre de pilotage RH</p>
+          <h2>Vue consolidée des indicateurs direction</h2>
+          <p>
+            Suivi opérationnel des effectifs, alertes, départs et données de qualité.
+          </p>
+        </div>
+      </section>
+
       <div className="kpi-grid">
         {visibleKpis.map((item) => (
           <KpiCard

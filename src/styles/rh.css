@@ -1958,6 +1958,15 @@
   text-decoration: underline;
 }
 
+.public-dashboard-shell {
+  width: min(1180px, calc(100vw - 48px));
+  max-width: 1180px;
+}
+
+.public-dashboard-shell .page-section {
+  padding: 0;
+}
+
 @media (max-width: 1180px) {
   .main-area {
     grid-template-columns: 240px minmax(0, 1fr);

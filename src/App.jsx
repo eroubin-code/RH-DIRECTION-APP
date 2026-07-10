@@ -121,6 +121,25 @@ export default function App() {
   }
 
   if (!currentUser) {
+    if (location.pathname === "/dashboard") {
+      return (
+        <main className="login-shell">
+          <section className="login-card public-dashboard-shell">
+            <div className="login-card-brand">
+              <BrandLogo alt="Logo IECB - dashboard public interne" />
+            </div>
+            <div className="login-heading">
+              <p className="login-eyebrow">Acces interne temporaire</p>
+              <h1 className="login-title">RH Direction App</h1>
+              <p className="login-text">Tableau de bord accessible sans authentification</p>
+            </div>
+            <Dashboard publicMode />
+          </section>
+          <p className="app-version-badge">{APP_VERSION}</p>
+        </main>
+      );
+    }
+
     return (
       <main className="login-shell">
         <section className="login-card">

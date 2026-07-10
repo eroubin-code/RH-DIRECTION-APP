@@ -122,6 +122,10 @@ export async function getDashboardData() {
   return request("/api/dashboard");
 }
 
+export async function getPublicDashboardData() {
+  return request("/api/public/dashboard", { token: null });
+}
+
 export async function getEffectif() {
   return request("/api/effectif");
 }

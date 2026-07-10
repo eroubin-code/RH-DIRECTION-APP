@@ -171,3 +171,101 @@ export async function createPersonnel(personnel) {
     body: JSON.stringify(personnel)
   });
 }
+
+export async function getAwarenessDashboard() {
+  return request("/api/awareness/dashboard");
+}
+
+export async function getAwarenessCampaigns() {
+  return request("/api/awareness/campaigns?anonymized=false");
+}
+
+export async function createAwarenessCampaign(payload) {
+  return request("/api/awareness/campaigns", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function validateAwarenessCampaign(campaignId, payload = {}) {
+  return request(`/api/awareness/campaigns/${campaignId}/validate`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function activateAwarenessCampaign(campaignId) {
+  return request(`/api/awareness/campaigns/${campaignId}/activate`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export async function cancelAwarenessCampaign(campaignId) {
+  return request(`/api/awareness/campaigns/${campaignId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export async function dispatchAwarenessCampaigns() {
+  return request("/api/awareness/dispatch", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export async function getAwarenessGroups() {
+  return request("/api/awareness/groups");
+}
+
+export async function createAwarenessGroup(payload) {
+  return request("/api/awareness/groups", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getAwarenessTemplates() {
+  return request("/api/awareness/templates");
+}
+
+export async function createAwarenessTemplate(payload) {
+  return request("/api/awareness/templates", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function attachAwarenessTemplate(campaignId, templateId) {
+  return request(`/api/awareness/campaigns/${campaignId}/template/attach`, {
+    method: "POST",
+    body: JSON.stringify({ templateId })
+  });
+}
+
+export async function importAwarenessRecipients(campaignId, csv) {
+  return request(`/api/awareness/campaigns/${campaignId}/recipients/import`, {
+    method: "POST",
+    body: JSON.stringify({ csv })
+  });
+}
+
+export async function importAwarenessGroup(campaignId, groupId) {
+  return request(`/api/awareness/campaigns/${campaignId}/groups/${groupId}/import`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export async function getAwarenessAudit(limit = 100) {
+  return request(`/api/awareness/audit?limit=${encodeURIComponent(limit)}`);
+}
+
+export function getAwarenessCsvReportUrl(campaignId) {
+  return `/api/awareness/campaigns/${campaignId}/report.csv`;
+}
+
+export function getAwarenessPdfReportUrl(campaignId) {
+  return `/api/awareness/campaigns/${campaignId}/report.pdf`;
+}

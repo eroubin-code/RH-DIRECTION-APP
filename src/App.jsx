@@ -13,6 +13,7 @@ import DepartsPage from "./pages/DepartsPage";
 import BadgesPage from "./pages/BadgesPage";
 import EntitesPage from "./pages/EntitesPage";
 import AdministrationPage from "./pages/AdministrationPage";
+import AwarenessPage from "./pages/AwarenessPage";
 
 const APP_VERSION = "Version 1.3 Beta";
 const FOOTER_NOTE = `RH Direction App - ${APP_VERSION}`;
@@ -171,36 +172,45 @@ export default function App() {
   return (
     <div className="app-shell app-rh">
       <div className="main-area">
-        {/* En-tete partage par toutes les vues du projet. */}
-        <Header currentUser={currentUser} onLogout={handleLogout} />
-        {/* Navigation principale presentee sous forme d'onglets. */}
         <Sidebar currentUser={currentUser} />
-        <main className="page-content">
-          {/* Routage principal vers les pages metier. */}
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/statistique" element={<StatistiquePage />} />
-            <Route path="/effectif" element={<EffectifPage />} />
-            <Route path="/departs" element={<DepartsPage />} />
-            <Route path="/badges" element={<BadgesPage />} />
-            <Route path="/entites" element={<EntitesPage />} />
-            <Route
-              path="/admin"
-              element={
-                ADMIN_ROLES.includes(currentUser.role) ? (
-                  <AdministrationPage currentUser={currentUser} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route path="/administration" element={<Navigate to="/admin" replace />} />
-          </Routes>
-        </main>
-        <footer className="app-version-footer">
-          <span>{FOOTER_NOTE}</span>
-        </footer>
+        <div className="workspace-main">
+          <Header currentUser={currentUser} onLogout={handleLogout} />
+          <main className="page-content">
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/statistique" element={<StatistiquePage />} />
+              <Route path="/effectif" element={<EffectifPage />} />
+              <Route path="/departs" element={<DepartsPage />} />
+              <Route path="/badges" element={<BadgesPage />} />
+              <Route path="/entites" element={<EntitesPage />} />
+              <Route
+                path="/awareness"
+                element={
+                  ADMIN_ROLES.includes(currentUser.role) ? (
+                    <AwarenessPage />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  ADMIN_ROLES.includes(currentUser.role) ? (
+                    <AdministrationPage currentUser={currentUser} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route path="/administration" element={<Navigate to="/admin" replace />} />
+            </Routes>
+          </main>
+          <footer className="app-version-footer">
+            <span>{FOOTER_NOTE}</span>
+          </footer>
+        </div>
       </div>
     </div>
   );

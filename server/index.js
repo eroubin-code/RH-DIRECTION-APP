@@ -15,11 +15,43 @@ import {
   USER_ROLES,
   users
 } from "./data/users.js";
+import {
+  activateAwarenessCampaign,
+  buildAwarenessReportCsv,
+  buildAwarenessReportPdf,
+  cancelAwarenessCampaign,
+  cleanupAwarenessData,
+  createAwarenessGroup,
+  createAwarenessTemplate,
+  createAwarenessCampaign,
+  dispatchDueAwarenessCampaigns,
+  excludeAwarenessRecipients,
+  getAwarenessDashboard,
+  getAwarenessCampaign,
+  handleAwarenessClick,
+  handleAwarenessReport,
+  handleAwarenessUnsubscribe,
+  importAwarenessRecipientsFromCsv,
+  importAwarenessRecipientsFromGroup,
+  listAwarenessAuditEntries,
+  listAwarenessGroups,
+  listAwarenessCampaigns,
+  listAwarenessTemplates,
+  receiveCampaignProviderEvent,
+  setAwarenessTemplate,
+  setAwarenessTemplateFromLibrary,
+  updateAwarenessGroup,
+  updateAwarenessTemplate,
+  updateAwarenessCampaign,
+  validateAwarenessCampaign
+} from "./awarenessCampaigns.js";
+import { getCampaignProvider } from "./campaignProvider.js";
 
 const app = express();
 const port = appConfig.port;
 const sessions = new Map();
 const loginAttempts = new Map();
+const requestWindowBuckets = new Map();
 const SESSION_TTL_MS = appConfig.auth.sessionTtlMs;
 
 function sanitizeUser(user) {
@@ -51,6 +83,7 @@ function requireAuth(request, response, next) {
 
   request.user = session.user;
   request.token = token;
+  request.session = session;
   next();
 }
 
@@ -200,6 +233,65 @@ function sendServerError(response) {
   response.status(500).json({ message: "Erreur serveur." });
 }
 
+function generateCsrfToken() {
+  return crypto.randomBytes(24).toString("hex");
+}
+
+function requireCsrf(request, response, next) {
+  const expectedToken = request.session?.csrfToken;
+  const headerName = appConfig.security.csrfHeaderName;
+  const providedToken = request.headers[headerName];
+
+  if (!expectedToken || providedToken !== expectedToken) {
+    response.status(403).json({ message: "Jeton CSRF invalide." });
+    return;
+  }
+
+  next();
+}
+
+function rateLimit(request, response, next) {
+  const remoteAddress = request.ip ?? request.socket?.remoteAddress ?? "unknown";
+  const now = Date.now();
+  const bucket = requestWindowBuckets.get(remoteAddress);
+
+  if (!bucket || bucket.resetAt <= now) {
+    requestWindowBuckets.set(remoteAddress, {
+      count: 1,
+      resetAt: now + appConfig.security.requestWindowMs
+    });
+    next();
+    return;
+  }
+
+  if (bucket.count >= appConfig.security.requestMaxPerWindow) {
+    response.status(429).json({ message: "Trop de requetes. Merci de ralentir." });
+    return;
+  }
+
+  bucket.count += 1;
+  next();
+}
+
+function inferBaseUrl(request) {
+  if (request) {
+    return `${request.protocol}://${request.get("host")}`;
+  }
+
+  return appConfig.awareness.publicBaseUrl;
+}
+
+function sendHtml(response, html) {
+  response.setHeader("Content-Type", "text/html; charset=utf-8");
+  response.status(200).send(html);
+}
+
+function sendDownload(response, filename, contentType, body) {
+  response.setHeader("Content-Type", contentType);
+  response.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  response.status(200).send(body);
+}
+
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("X-Frame-Options", "DENY");
@@ -208,6 +300,7 @@ app.use((_request, response, next) => {
   next();
 });
 
+app.use(rateLimit);
 app.use(express.json({ limit: appConfig.security.jsonLimit }));
 
 app.get("/api/health", async (_request, response) => {
@@ -249,20 +342,22 @@ app.post("/api/auth/login", (request, response) => {
   sessions.set(token, {
     user: sanitizeUser(user),
     createdAt: Date.now(),
-    expiresAt: Date.now() + SESSION_TTL_MS
+    expiresAt: Date.now() + SESSION_TTL_MS,
+    csrfToken: generateCsrfToken()
   });
 
   response.json({
     token,
+    csrfToken: sessions.get(token).csrfToken,
     user: sanitizeUser(user)
   });
 });
 
 app.get("/api/auth/me", requireAuth, (request, response) => {
-  response.json({ user: request.user });
+  response.json({ user: request.user, csrfToken: request.session.csrfToken });
 });
 
-app.post("/api/auth/logout", requireAuth, (request, response) => {
+app.post("/api/auth/logout", requireAuth, requireCsrf, (request, response) => {
   sessions.delete(request.token);
   response.status(204).end();
 });
@@ -280,6 +375,7 @@ app.post(
   "/api/admin/users",
   requireAuth,
   requireRole(["admin", "operateur"]),
+  requireCsrf,
   (request, response) => {
     const username = String(request.body?.username ?? "").trim();
     const password = String(request.body?.password ?? "");
@@ -328,6 +424,7 @@ app.patch(
   "/api/admin/users/:id/password",
   requireAuth,
   requireRole(["admin", "operateur"]),
+  requireCsrf,
   (request, response) => {
     const userId = Number(request.params.id);
     const password = String(request.body?.password ?? "");
@@ -376,6 +473,7 @@ app.post(
   "/api/admin/personnel",
   requireAuth,
   requireRole(["admin", "operateur"]),
+  requireCsrf,
   async (request, response) => {
     const civilite = normalizeCivilite(request.body?.civilite);
     const nom = normalizeUpperText(request.body?.nom);
@@ -473,6 +571,473 @@ app.get("/api/effectif", requireAuth, async (_request, response) => {
   }
 });
 
+app.get(
+  "/api/awareness/dashboard",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (_request, response) => {
+    response.json(getAwarenessDashboard());
+  }
+);
+
+app.get(
+  "/api/awareness/campaigns",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (request, response) => {
+    const anonymized = request.query.anonymized !== "false";
+    response.json(
+      listAwarenessCampaigns().map((campaign) => ({
+        ...campaign,
+        anonymized
+      }))
+    );
+  }
+);
+
+app.get(
+  "/api/awareness/campaigns/:campaignId",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (request, response) => {
+    const campaign = getAwarenessCampaign(request.params.campaignId, {
+      anonymized: request.query.anonymized !== "false"
+    });
+
+    if (!campaign) {
+      response.status(404).json({ message: "Campagne introuvable." });
+      return;
+    }
+
+    response.json(campaign);
+  }
+);
+
+app.post(
+  "/api/awareness/groups",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.status(201).json(createAwarenessGroup(request.body ?? {}, request.user));
+    } catch (error) {
+      response.status(400).json({ message: error.message });
+    }
+  }
+);
+
+app.get(
+  "/api/awareness/groups",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (_request, response) => {
+    response.json(listAwarenessGroups());
+  }
+);
+
+app.patch(
+  "/api/awareness/groups/:groupId",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        updateAwarenessGroup(request.params.groupId, request.body ?? {})
+      );
+    } catch (error) {
+      const statusCode = error.message === "Groupe introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/templates",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.status(201).json(createAwarenessTemplate(request.body ?? {}));
+    } catch (error) {
+      response.status(400).json({ message: error.message });
+    }
+  }
+);
+
+app.get(
+  "/api/awareness/templates",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (_request, response) => {
+    response.json(listAwarenessTemplates());
+  }
+);
+
+app.patch(
+  "/api/awareness/templates/:templateId",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        updateAwarenessTemplate(request.params.templateId, request.body ?? {})
+      );
+    } catch (error) {
+      const statusCode = error.message === "Modele introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      const campaign = createAwarenessCampaign(request.body ?? {}, request.user);
+      response.status(201).json(campaign);
+    } catch (error) {
+      const badRequestMessages = new Set([
+        "Date invalide.",
+        "La date de fin doit etre posterieure a la date de debut.",
+        "Nom de campagne obligatoire.",
+        "Description obligatoire.",
+        "Responsable obligatoire.",
+        "Reference d'autorisation obligatoire.",
+        "Le module awareness est desactive."
+      ]);
+      const statusCode = badRequestMessages.has(error.message) ? 400 : 500;
+      response.status(statusCode).json({
+        message: statusCode === 400 ? error.message : "Erreur serveur."
+      });
+    }
+  }
+);
+
+app.patch(
+  "/api/awareness/campaigns/:campaignId",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        updateAwarenessCampaign(request.params.campaignId, request.body ?? {}, request.user)
+      );
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns/:campaignId/recipients/import",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        importAwarenessRecipientsFromCsv(
+          request.params.campaignId,
+          request.body?.csv ?? "",
+          request.user
+        )
+      );
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns/:campaignId/groups/:groupId/import",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        importAwarenessRecipientsFromGroup(
+          request.params.campaignId,
+          request.params.groupId,
+          request.user
+        )
+      );
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." || error.message === "Groupe introuvable."
+          ? 404
+          : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns/:campaignId/recipients/exclude",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        excludeAwarenessRecipients(
+          request.params.campaignId,
+          request.body ?? {},
+          request.user
+        )
+      );
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.put(
+  "/api/awareness/campaigns/:campaignId/template",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        setAwarenessTemplate(request.params.campaignId, request.body ?? {}, request.user)
+      );
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns/:campaignId/template/attach",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        setAwarenessTemplateFromLibrary(
+          request.params.campaignId,
+          request.body?.templateId ?? "",
+          request.user
+        )
+      );
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." || error.message === "Modele introuvable."
+          ? 404
+          : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns/:campaignId/validate",
+  requireAuth,
+  requireRole(["admin"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(
+        validateAwarenessCampaign(
+          request.params.campaignId,
+          request.body ?? {},
+          request.user
+        )
+      );
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns/:campaignId/activate",
+  requireAuth,
+  requireRole(["admin"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(activateAwarenessCampaign(request.params.campaignId, request.user));
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/campaigns/:campaignId/cancel",
+  requireAuth,
+  requireRole(["admin"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.json(cancelAwarenessCampaign(request.params.campaignId, request.user));
+    } catch (error) {
+      const statusCode =
+        error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/dispatch",
+  requireAuth,
+  requireRole(["admin"]),
+  requireCsrf,
+  async (request, response) => {
+    try {
+      const dispatched = await dispatchDueAwarenessCampaigns(inferBaseUrl(request));
+      response.json({
+        dispatchedCount: dispatched.length,
+        deliveries: dispatched
+      });
+    } catch {
+      sendServerError(response);
+    }
+  }
+);
+
+app.get(
+  "/api/awareness/outbox",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (_request, response) => {
+    response.json(getCampaignProvider().listPreviews());
+  }
+);
+
+app.get(
+  "/api/awareness/audit",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (request, response) => {
+    const limit = Number.parseInt(String(request.query.limit ?? "200"), 10);
+    response.json(listAwarenessAuditEntries(Number.isInteger(limit) ? limit : 200));
+  }
+);
+
+app.get(
+  "/api/awareness/campaigns/:campaignId/report.csv",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (request, response) => {
+    try {
+      sendDownload(
+        response,
+        `awareness-report-${request.params.campaignId}.csv`,
+        "text/csv; charset=utf-8",
+        buildAwarenessReportCsv(request.params.campaignId)
+      );
+    } catch (error) {
+      const statusCode = error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.get(
+  "/api/awareness/campaigns/:campaignId/report.pdf",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  (request, response) => {
+    try {
+      sendDownload(
+        response,
+        `awareness-report-${request.params.campaignId}.pdf`,
+        "application/pdf",
+        buildAwarenessReportPdf(request.params.campaignId)
+      );
+    } catch (error) {
+      const statusCode = error.message === "Campagne introuvable." ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/awareness/provider/events",
+  requireAuth,
+  requireRole(["admin"]),
+  requireCsrf,
+  (request, response) => {
+    try {
+      response.status(201).json(receiveCampaignProviderEvent(request.body ?? {}));
+    } catch (error) {
+      const notFoundMessages = new Set(["Message provider introuvable."]);
+      const statusCode = notFoundMessages.has(error.message) ? 404 : 400;
+      response.status(statusCode).json({ message: error.message });
+    }
+  }
+);
+
+app.get("/awareness/click/:trackingId", (request, response) => {
+  try {
+    sendHtml(
+      response,
+      handleAwarenessClick({
+        trackingId: request.params.trackingId,
+        expiresAt: request.query.exp,
+        signature: request.query.sig
+      })
+    );
+  } catch (error) {
+    response.status(400).send(error.message);
+  }
+});
+
+app.get("/awareness/report/:trackingId", (request, response) => {
+  try {
+    sendHtml(
+      response,
+      handleAwarenessReport({
+        trackingId: request.params.trackingId,
+        expiresAt: request.query.exp,
+        signature: request.query.sig
+      })
+    );
+  } catch (error) {
+    response.status(400).send(error.message);
+  }
+});
+
+app.get("/awareness/unsubscribe/:trackingId", (request, response) => {
+  try {
+    sendHtml(
+      response,
+      handleAwarenessUnsubscribe({
+        trackingId: request.params.trackingId,
+        expiresAt: request.query.exp,
+        signature: request.query.sig
+      })
+    );
+  } catch (error) {
+    response.status(400).send(error.message);
+  }
+});
+
 app.get("/api/departs", requireAuth, async (_request, response) => {
   try {
     const dataset = await getRhDataset();
@@ -516,3 +1081,27 @@ app.get("/api/statistiques/annuel", requireAuth, async (request, response) => {
 app.listen(port, () => {
   console.log(`RH backend listening on http://localhost:${port}`);
 });
+
+if (appConfig.awareness.enabled) {
+  const awarenessDispatchTimer = setInterval(async () => {
+    const dispatched = await dispatchDueAwarenessCampaigns(
+      appConfig.awareness.publicBaseUrl
+    );
+
+    if (dispatched.length > 0) {
+      console.log(`[awareness] ${dispatched.length} message(s) prepares en mode preview.`);
+    }
+  }, appConfig.awareness.dispatchIntervalMs);
+
+  awarenessDispatchTimer.unref?.();
+
+  const awarenessCleanupTimer = setInterval(() => {
+    const result = cleanupAwarenessData();
+
+    if (result.removedCampaigns > 0) {
+      console.log(`[awareness] ${result.removedCampaigns} campagne(s) purgee(s).`);
+    }
+  }, appConfig.awareness.cleanupIntervalMs);
+
+  awarenessCleanupTimer.unref?.();
+}

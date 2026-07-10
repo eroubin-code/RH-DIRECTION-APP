@@ -90,7 +90,10 @@ export const appConfig = {
   },
   security: {
     exposeHealthDetails: readBoolean("RH_HEALTH_DETAILS", false),
-    jsonLimit: readString("RH_JSON_LIMIT", "100kb")
+    jsonLimit: readString("RH_JSON_LIMIT", "100kb"),
+    csrfHeaderName: readString("RH_CSRF_HEADER_NAME", "x-csrf-token"),
+    requestWindowMs: readNumber("RH_REQUEST_WINDOW_MS", 60 * 1000),
+    requestMaxPerWindow: readNumber("RH_REQUEST_MAX_PER_WINDOW", 120)
   },
   dataSource: {
     mode: readString("RH_DATA_SOURCE", "mock"),
@@ -111,5 +114,38 @@ export const appConfig = {
     departs: readString("MYSQL_VIEW_DEPARTS", "vw_rh_departs"),
     badges: readString("MYSQL_VIEW_BADGES", "vw_rh_badges"),
     entites: readString("MYSQL_VIEW_ENTITES", "vw_rh_entites")
+  },
+  awareness: {
+    enabled: readBoolean("RH_AWARENESS_ENABLED", true),
+    storePath: readString(
+      "RH_AWARENESS_STORE_PATH",
+      "server/data/awareness-campaigns.store.json"
+    ),
+    outboxPath: readString(
+      "RH_AWARENESS_OUTBOX_PATH",
+      "server/data/awareness-outbox.store.json"
+    ),
+    cleanupIntervalMs: readNumber("RH_AWARENESS_CLEANUP_INTERVAL_MS", 60 * 60 * 1000),
+    dispatchIntervalMs: readNumber("RH_AWARENESS_DISPATCH_INTERVAL_MS", 5 * 60 * 1000),
+    allowedDomains: readString("RH_AWARENESS_ALLOWED_DOMAINS", "iecb.fr")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+    linkSecret: readString("RH_AWARENESS_LINK_SECRET", "awareness-link-secret"),
+    linkTtlHours: readNumber("RH_AWARENESS_LINK_TTL_HOURS", 24 * 45),
+    retentionDays: readNumber("RH_AWARENESS_RETENTION_DAYS", 90),
+    anonymizeReportsByDefault: readBoolean(
+      "RH_AWARENESS_ANONYMIZE_REPORTS",
+      true
+    ),
+    warningBanner: readString(
+      "RH_AWARENESS_WARNING_BANNER",
+      "Exercice interne de sensibilisation IECB."
+    ),
+    publicBaseUrl: readString("RH_AWARENESS_PUBLIC_BASE_URL", "http://127.0.0.1:3001"),
+    fromEmail: readString("RH_AWARENESS_FROM_EMAIL", "communication-rh@iecb.fr"),
+    fromName: readString("RH_AWARENESS_FROM_NAME", "Communication RH"),
+    replyTo: readString("RH_AWARENESS_REPLY_TO", "communication-rh@iecb.fr"),
+    provider: readString("RH_AWARENESS_PROVIDER", "preview")
   }
 };

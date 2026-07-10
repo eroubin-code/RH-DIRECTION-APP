@@ -1,5 +1,6 @@
 // Service frontend pour dialoguer avec le backend local RH.
 const AUTH_TOKEN_KEY = "rh-auth-token";
+const CSRF_TOKEN_KEY = "rh-csrf-token";
 export const AUTH_EXPIRED_EVENT = "rh-auth-expired";
 
 function getStoredToken() {
@@ -10,8 +11,17 @@ function setStoredToken(token) {
   window.localStorage.setItem(AUTH_TOKEN_KEY, token);
 }
 
+function getStoredCsrfToken() {
+  return window.localStorage.getItem(CSRF_TOKEN_KEY);
+}
+
+function setStoredCsrfToken(token) {
+  window.localStorage.setItem(CSRF_TOKEN_KEY, token);
+}
+
 export function clearStoredToken() {
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
+  window.localStorage.removeItem(CSRF_TOKEN_KEY);
 }
 
 async function request(path, options = {}) {
@@ -23,6 +33,12 @@ async function request(path, options = {}) {
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  }
+
+  const csrfToken = options.csrfToken ?? getStoredCsrfToken();
+
+  if (csrfToken && ["POST", "PATCH", "PUT", "DELETE"].includes(String(options.method ?? "GET").toUpperCase())) {
+    headers["x-csrf-token"] = csrfToken;
   }
 
   const response = await fetch(path, {
@@ -64,6 +80,7 @@ export async function login(username, password) {
   });
 
   setStoredToken(payload.token);
+  setStoredCsrfToken(payload.csrfToken);
   return payload.user;
 }
 
@@ -91,6 +108,9 @@ export async function getCurrentUser() {
 
   try {
     const payload = await request("/api/auth/me", { token });
+    if (payload.csrfToken) {
+      setStoredCsrfToken(payload.csrfToken);
+    }
     return payload.user;
   } catch {
     clearStoredToken();

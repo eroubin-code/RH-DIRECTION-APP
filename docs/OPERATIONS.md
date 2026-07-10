@@ -54,6 +54,33 @@ curl -s http://127.0.0.1:3001/api/health
 - Site Nginx actif : `/etc/nginx/sites-enabled/rh-direction-app`
 - Variables serveur : `/opt/rh-direction-app/.env`
 - Utilisateurs crees : `/opt/rh-direction-app/server/data/users.store.json`
+- Campagnes awareness : `/opt/rh-direction-app/server/data/awareness-campaigns.store.json`
+- Outbox preview awareness : `/opt/rh-direction-app/server/data/awareness-outbox.store.json`
+
+## Module awareness
+
+Le backend prepare automatiquement les messages dus toutes les 5 minutes par defaut, sans emission SMTP reelle.
+
+Verifier les traces de traitement :
+
+```bash
+journalctl -u rh-direction-app.service -n 100 --no-pager | grep awareness
+```
+
+Declencher un traitement manuel :
+
+```bash
+curl -X POST http://127.0.0.1:3001/api/awareness/dispatch \
+  -H "Authorization: Bearer <token-admin>" \
+  -H "x-csrf-token: <csrf-token>"
+```
+
+Consulter les messages prepares localement :
+
+```bash
+curl -s http://127.0.0.1:3001/api/awareness/outbox \
+  -H "Authorization: Bearer <token-admin>"
+```
 
 ## Rollback simple
 

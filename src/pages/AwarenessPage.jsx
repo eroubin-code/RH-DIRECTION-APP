@@ -17,6 +17,7 @@ import {
   getAwarenessTemplates,
   importAwarenessGroup,
   importAwarenessRecipients,
+  updateAwarenessGroup,
   validateAwarenessCampaign
 } from "../services/api";
 
@@ -61,6 +62,7 @@ export default function AwarenessPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState("");
   const [recipientCsv, setRecipientCsv] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -123,6 +125,23 @@ export default function AwarenessPage() {
     { key: "username", label: "Acteur" },
     { key: "action", label: "Action" }
   ];
+
+  function loadGroupIntoForm(groupId) {
+    const group = groups.find((entry) => entry.id === groupId);
+
+    if (!group) {
+      setEditingGroupId("");
+      setGroupForm(initialGroupForm);
+      return;
+    }
+
+    setEditingGroupId(group.id);
+    setGroupForm({
+      name: group.name ?? "",
+      description: group.description ?? "",
+      members: Array.isArray(group.members) ? group.members.join("\n") : ""
+    });
+  }
 
   return (
     <div className="page-section rh-section awareness-page">
@@ -258,25 +277,47 @@ export default function AwarenessPage() {
 
         <section className="content-card rh-panel">
           <div className="section-title">
-            <h3 className="rh-panel-title">Nouveau groupe</h3>
+            <h3 className="rh-panel-title">
+              {editingGroupId ? "Modifier le groupe" : "Nouveau groupe"}
+            </h3>
           </div>
           <form
             className="admin-form awareness-form"
             onSubmit={(event) => {
               event.preventDefault();
               runAction(async () => {
-                await createAwarenessGroup({
+                const payload = {
                   ...groupForm,
                   members: groupForm.members
                     .split(/\r?\n|,|;/)
                     .map((member) => member.trim())
                     .filter(Boolean)
-                });
+                };
+
+                if (editingGroupId) {
+                  await updateAwarenessGroup(editingGroupId, payload);
+                  setMessage("Groupe mis a jour.");
+                } else {
+                  await createAwarenessGroup(payload);
+                  setMessage("Groupe cree.");
+                }
+
+                setEditingGroupId("");
                 setGroupForm(initialGroupForm);
-                setMessage("Groupe cree.");
               });
             }}
           >
+            <select
+              value={editingGroupId}
+              onChange={(event) => loadGroupIntoForm(event.target.value)}
+            >
+              <option value="">Creer un nouveau groupe</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
             <input
               placeholder="Nom du groupe"
               value={groupForm.name}
@@ -298,9 +339,23 @@ export default function AwarenessPage() {
                 setGroupForm((previous) => ({ ...previous, members: event.target.value }))
               }
             />
-            <button className="login-button" type="submit">
-              Creer le groupe
-            </button>
+            <div className="awareness-actions">
+              <button className="login-button" type="submit">
+                {editingGroupId ? "Enregistrer le groupe" : "Creer le groupe"}
+              </button>
+              {editingGroupId ? (
+                <button
+                  className="effectif-reset"
+                  type="button"
+                  onClick={() => {
+                    setEditingGroupId("");
+                    setGroupForm(initialGroupForm);
+                  }}
+                >
+                  Annuler l'edition
+                </button>
+              ) : null}
+            </div>
           </form>
         </section>
       </div>

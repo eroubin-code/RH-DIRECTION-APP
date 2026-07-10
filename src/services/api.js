@@ -226,6 +226,13 @@ export async function createAwarenessGroup(payload) {
   });
 }
 
+export async function updateAwarenessGroup(groupId, payload) {
+  return request(`/api/awareness/groups/${groupId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function getAwarenessTemplates() {
   return request("/api/awareness/templates");
 }

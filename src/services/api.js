@@ -99,6 +99,31 @@ export async function logout() {
   clearStoredToken();
 }
 
+export async function requestPasswordResetCode(username) {
+  return request("/api/auth/request-password-reset", {
+    method: "POST",
+    body: JSON.stringify({ username }),
+    token: null
+  });
+}
+
+export async function resetPasswordWithCode(username, code, password) {
+  return request("/api/auth/reset-password-with-code", {
+    method: "POST",
+    body: JSON.stringify({ username, code, password }),
+    token: null
+  });
+}
+
+export async function changePassword(password) {
+  const payload = await request("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ password })
+  });
+
+  return payload.user;
+}
+
 export async function getCurrentUser() {
   const token = getStoredToken();
 
@@ -173,6 +198,35 @@ export async function createPersonnel(personnel) {
   return request("/api/admin/personnel", {
     method: "POST",
     body: JSON.stringify(personnel)
+  });
+}
+
+export async function submitPendingPersonnel(personnel) {
+  return request("/api/personnel/pending", {
+    method: "POST",
+    body: JSON.stringify(personnel)
+  });
+}
+
+export async function getPendingPersonnel() {
+  return request("/api/personnel/pending");
+}
+
+export async function getGlpiArrivals() {
+  return request("/api/personnel/glpi-arrivals");
+}
+
+export async function validatePendingPersonnel(id) {
+  return request(`/api/personnel/pending/${id}/validate`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export async function rejectPendingPersonnel(id, comment = "") {
+  return request(`/api/personnel/pending/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ comment })
   });
 }
 

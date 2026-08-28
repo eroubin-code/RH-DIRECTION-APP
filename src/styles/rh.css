@@ -377,6 +377,28 @@
   padding: 0 18px;
 }
 
+.login-link-button {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  align-self: center;
+  padding: 4px;
+}
+
+.login-link-button:hover {
+  color: var(--primary-dark);
+}
+
+.admin-form-hint {
+  display: block;
+  color: var(--muted, #6b7280);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 .header-button.primary {
   background: var(--primary-dark);
 }
@@ -1095,6 +1117,32 @@
   border-radius: 16px;
   background: #fbfdff;
   padding: 24px;
+}
+
+.admin-glpi-arrivals {
+  border: 1px solid #e5eaf0;
+  border-radius: 16px;
+  background: #fff;
+  padding: 24px;
+}
+
+.admin-glpi-arrivals-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-glpi-arrivals-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e5eaf0;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
 }
 
 .admin-personnel-form {

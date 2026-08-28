@@ -49,6 +49,16 @@ RH_AWARENESS_FROM_EMAIL=communication-rh@iecb.fr
 RH_AWARENESS_FROM_NAME=Communication RH
 RH_AWARENESS_REPLY_TO=communication-rh@iecb.fr
 RH_AWARENESS_PROVIDER=preview
+
+RH_SMTP_ENABLED=false
+RH_SMTP_HOST=
+RH_SMTP_PORT=587
+RH_SMTP_SECURE=false
+RH_SMTP_USER=
+RH_SMTP_PASSWORD=
+RH_SMTP_FROM_EMAIL=
+RH_SMTP_FROM_NAME=RH Direction
+RH_SMTP_ADMIN_RECIPIENTS=
 ```
 
 ## Sources de donnees
@@ -111,6 +121,15 @@ Le backend interroge MySQL via `mysql2`.
 - `RH_AWARENESS_FROM_NAME` : nom d'affichage fixe.
 - `RH_AWARENESS_REPLY_TO` : adresse de reponse fixe.
 - `RH_AWARENESS_PROVIDER` : provider local actuel, `preview` uniquement dans cette implementation.
+- `RH_SMTP_ENABLED` : active l'envoi reel d'email (saisie de nouveaux arrivants a valider, voir [ADMINISTRATION.md](ADMINISTRATION.md)) ; si `false`, les emails sont uniquement journalises en console.
+- `RH_SMTP_HOST` : hote du serveur SMTP.
+- `RH_SMTP_PORT` : port SMTP, par defaut `587`.
+- `RH_SMTP_SECURE` : connexion SMTPS directe si `true` (sinon STARTTLS selon le serveur).
+- `RH_SMTP_USER` : utilisateur d'authentification SMTP.
+- `RH_SMTP_PASSWORD` : mot de passe d'authentification SMTP.
+- `RH_SMTP_FROM_EMAIL` : adresse d'expedition des emails.
+- `RH_SMTP_FROM_NAME` : nom d'affichage de l'expediteur.
+- `RH_SMTP_ADMIN_RECIPIENTS` : liste de destinataires admin (separes par des virgules) prevenus des nouvelles saisies a valider.
 
 ## Vues SQL attendues
 

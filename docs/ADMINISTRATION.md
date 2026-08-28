@@ -14,6 +14,7 @@ Elle est disponible uniquement pour les roles :
 
 - `admin`
 - `operateur`
+- `operateur_saisie` (acces restreint, voir "Saisie et validation des nouveaux arrivants" ci-dessous)
 
 Les utilisateurs `beta` n'ont pas acces a cette page.
 
@@ -23,6 +24,10 @@ Sur cette page, les onglets metier sont remplaces par des onglets dedies a l'adm
 - `Personnel`
 - `Batiments`
 - `Plans`
+- `Saisie arrivants`
+
+Un `operateur_saisie` ne voit et n'accede qu'a l'onglet `Saisie arrivants` ; les
+autres onglets (et les endpoints API correspondants) lui sont fermes.
 
 ## Creation d'un utilisateur
 
@@ -63,6 +68,57 @@ Lors de la creation :
 - une adresse est creee dans `messagerie` au format `userid@iecb.u-bordeaux.fr`, sauf si la fonction est `Stagiaire`.
 
 Les onglets `Batiments` et `Plans` preparent les prochains modules d'administration. Les ecritures en base seront ajoutees apres validation du modele de donnees.
+
+## Saisie et validation des nouveaux arrivants
+
+Le role `operateur_saisie` peut saisir un nouvel arrivant depuis l'onglet `Saisie
+arrivants`, mais ne peut pas l'enregistrer directement dans la base RH. Sa saisie
+est stockee dans la table `rh_personnel_pending` (base `iecbman2020`) avec le
+statut `en_attente`, et un email est envoye aux administrateurs configures
+(`RH_SMTP_ADMIN_RECIPIENTS`, voir [CONFIGURATION.md](CONFIGURATION.md)) pour les
+prevenir.
+
+Un `admin` ou `operateur` retrouve les saisies en attente dans le meme onglet
+`Saisie arrivants` et peut :
+
+- **Valider** : cree reellement le personnel (memes effets que la creation directe
+  depuis l'onglet `Personnel` : insertion dans `personnes`, `personnes_entites`,
+  et `messagerie`), puis marque la saisie `validee`.
+- **Rejeter** (avec un motif optionnel) : marque la saisie `rejetee`, rien n'est
+  cree dans la base RH.
+
+Un `operateur_saisie` ne voit que ses propres saisies et leur statut, sans action
+possible dessus.
+
+## API — Saisie en attente
+
+Soumettre une saisie (`admin`, `operateur`, `operateur_saisie`) :
+
+```http
+POST /api/personnel/pending
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "civilite": "Madame", "nom": "...", "prenom": "...", "entite": "...", "arrivee": "2026-09-01", ... }
+```
+
+Lister les saisies (`admin`, `operateur` voient tout ; `operateur_saisie` ne voit que les siennes) :
+
+```http
+GET /api/personnel/pending
+Authorization: Bearer <token>
+```
+
+Valider ou rejeter (`admin`, `operateur` uniquement) :
+
+```http
+POST /api/personnel/pending/:id/validate
+POST /api/personnel/pending/:id/reject
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "comment": "Motif du rejet (facultatif)" }
+```
 
 ## Stockage
 

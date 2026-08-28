@@ -1233,7 +1233,15 @@ export function getAwarenessDashboard() {
 }
 
 function escapeCsvValue(value) {
-  const normalized = String(value ?? "");
+  let normalized = String(value ?? "");
+
+  // Neutralise l'injection de formule tableur (CSV injection) : un champ importe
+  // (nom, service, groupe...) commencant par ces caracteres serait interprete comme
+  // une formule ou une commande DDE par Excel/LibreOffice a l'ouverture du rapport.
+  if (/^[=+\-@\t\r]/.test(normalized)) {
+    normalized = `'${normalized}`;
+  }
+
   if (/[;"\n]/.test(normalized)) {
     return `"${normalized.replaceAll("\"", "\"\"")}"`;
   }

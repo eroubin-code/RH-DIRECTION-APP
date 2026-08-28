@@ -8,23 +8,43 @@ const mainLinks = [
   { to: "/statistique", label: "Statistique", icon: "◔" },
   { to: "/departs", label: "Départs", icon: "↗" },
   { to: "/badges", label: "Badges", icon: "▣" },
-  { to: "/awareness", label: "Awareness", icon: "⚑", adminOnly: true }
+  { to: "/awareness", label: "Awareness", icon: "⚑", roles: ["admin", "operateur"] },
+  {
+    to: "/admin?section=saisie",
+    label: "Saisie arrivants",
+    icon: "✎",
+    roles: ["admin", "operateur", "operateur_saisie"]
+  },
+  {
+    to: "/admin",
+    label: "Administration",
+    icon: "⚙",
+    roles: ["admin", "operateur", "operateur_saisie"]
+  }
 ];
 
 const adminLinks = [
-  { to: "/admin", label: "Utilisateurs", panel: "utilisateurs", icon: "◎" },
-  { to: "/admin?section=personnel", label: "Personnel", panel: "personnel", icon: "＋" },
-  { to: "/admin?section=batiments", label: "Bâtiments", panel: "batiments", icon: "▤" },
-  { to: "/admin?section=plans", label: "Plans", panel: "plans", icon: "⌖" }
+  { to: "/admin", label: "Utilisateurs", panel: "utilisateurs", icon: "◎", roles: ["admin", "operateur"] },
+  { to: "/admin?section=personnel", label: "Personnel", panel: "personnel", icon: "＋", roles: ["admin", "operateur"] },
+  { to: "/admin?section=batiments", label: "Bâtiments", panel: "batiments", icon: "▤", roles: ["admin", "operateur"] },
+  { to: "/admin?section=plans", label: "Plans", panel: "plans", icon: "⌖", roles: ["admin", "operateur"] },
+  {
+    to: "/admin?section=saisie",
+    label: "Saisie arrivants",
+    panel: "saisie",
+    icon: "✎",
+    roles: ["admin", "operateur", "operateur_saisie"]
+  }
 ];
 
 export default function Sidebar({ currentUser }) {
   const location = useLocation();
   const isAdminPage = location.pathname === "/admin";
   const selectedAdminPanel =
-    new URLSearchParams(location.search).get("section") ?? "utilisateurs";
+    new URLSearchParams(location.search).get("section") ??
+    (currentUser.role === "operateur_saisie" ? "saisie" : "utilisateurs");
   const links = (isAdminPage ? adminLinks : mainLinks).filter(
-    (link) => !link.adminOnly || ["admin", "operateur"].includes(currentUser.role)
+    (link) => !link.roles || link.roles.includes(currentUser.role)
   );
 
   return (

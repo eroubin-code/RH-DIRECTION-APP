@@ -46,6 +46,111 @@ async function getConnection() {
   return currentPool.getConnection();
 }
 
+// Pool separe pour la base GLPI (glpi-9.4.3) : base distincte de iecbman2020,
+// compte MySQL dedie en lecture seule (voir docs/CONFIGURATION.md, RH_GLPI_*).
+let glpiPool = null;
+
+async function getGlpiPool() {
+  if (glpiPool) {
+    return glpiPool;
+  }
+
+  const mysql = await loadMysqlModule();
+  glpiPool = mysql.createPool({
+    host: appConfig.glpi.host,
+    port: appConfig.glpi.port,
+    user: appConfig.glpi.user,
+    password: appConfig.glpi.password,
+    database: appConfig.glpi.database,
+    charset: "utf8mb4",
+    waitForConnections: true,
+    connectionLimit: 2,
+    queueLimit: 0
+  });
+  return glpiPool;
+}
+
+// Soumissions du formulaire GLPI "Inscription nouvel arrivant" (plugin
+// Formcreator) pas encore importees dans rh_personnel_pending, pour
+// pre-remplir la saisie RH sans re-taper les informations. Fonctionnalite
+// optionnelle : sans compte GLPI configure, retourne simplement une liste vide
+// plutot que d'echouer (RH app doit rester utilisable sans acces a GLPI).
+export async function getGlpiNewArrivalSubmissions() {
+  if (!appConfig.glpi.user || appConfig.dataSource.mode !== "mysql") {
+    return [];
+  }
+
+  // Deux bases distinctes (glpi-9.4.3 / iecbman2020), deux comptes MySQL separes
+  // (rh_glpi_reader n'a pas de droits sur iecbman2020) : le filtrage "deja
+  // importe" ne peut pas se faire en une seule requete cote serveur MySQL, on le
+  // fait en JS a partir des deux resultats.
+  const currentPool = await getGlpiPool();
+  const [answerRows] = await currentPool.query(
+    [
+      "SELECT fa.id AS formanswer_id, fa.request_date, q.name AS question, a.answer",
+      "FROM glpi_plugin_formcreator_formanswers fa",
+      "JOIN glpi_plugin_formcreator_answers a ON a.plugin_formcreator_formanswers_id = fa.id",
+      "JOIN glpi_plugin_formcreator_questions q ON q.id = a.plugin_formcreator_questions_id",
+      "WHERE fa.plugin_formcreator_forms_id = ?",
+      "  AND fa.status = 'accepted'",
+      "  AND fa.request_date >= (NOW() - INTERVAL 90 DAY)",
+      "ORDER BY fa.id, q.order"
+    ].join(" "),
+    [appConfig.glpi.formId]
+  );
+
+  const alreadyImportedRows = await queryRows(
+    "SELECT glpi_formanswer_id FROM rh_personnel_pending WHERE glpi_formanswer_id IS NOT NULL"
+  );
+  const alreadyImportedIds = new Set(
+    alreadyImportedRows.map((row) => Number(row.glpi_formanswer_id))
+  );
+
+  const submissionsById = new Map();
+
+  for (const row of answerRows) {
+    if (!submissionsById.has(row.formanswer_id)) {
+      submissionsById.set(row.formanswer_id, {
+        glpiFormanswerId: row.formanswer_id,
+        requestDate: row.request_date,
+        civilite: "",
+        nom: "",
+        prenom: "",
+        naissance: "",
+        pays: "",
+        tutelle: "",
+        entite: "",
+        fonction: "",
+        arrivee: "",
+        depart: "",
+        isPermanent: null
+      });
+    }
+
+    const submission = submissionsById.get(row.formanswer_id);
+    const question = String(row.question ?? "").trim().toLowerCase();
+    const answer = String(row.answer ?? "").trim();
+
+    if (question.startsWith("civilité")) submission.civilite = answer;
+    else if (question.startsWith("nom")) submission.nom = answer.toLocaleUpperCase("fr-FR");
+    else if (question.startsWith("prénom")) submission.prenom = answer;
+    else if (question.startsWith("date de naissance")) submission.naissance = answer;
+    else if (question.startsWith("pays de naissance")) submission.pays = answer;
+    else if (question.startsWith("tutelle")) submission.tutelle = answer;
+    else if (question.startsWith("equipes")) submission.entite = answer;
+    else if (question.startsWith("fonction")) submission.fonction = answer;
+    else if (question.startsWith("date arrivée")) submission.arrivee = answer;
+    else if (question.startsWith("date de départ")) submission.depart = answer;
+    else if (question.startsWith("type de personnel")) {
+      submission.isPermanent = answer.toLowerCase() === "personnel permanent";
+    }
+  }
+
+  return [...submissionsById.values()].filter(
+    (submission) => !alreadyImportedIds.has(Number(submission.glpiFormanswerId))
+  );
+}
+
 function normalizeSnapshotDate(value) {
   const normalizedValue = String(value ?? "").trim();
 
@@ -359,6 +464,122 @@ export async function createPersonnel(personnel) {
   }
 }
 
+// File d'attente des saisies de nouveaux arrivants par un operateur_saisie, en
+// attente de validation par un admin/operateur. Table dediee rh_personnel_pending
+// dans iecbman2020 (hors schema gere par ce depot). MySQL uniquement, meme garde
+// que createPersonnel : la saisie mock n'a pas de sens sans base a valider.
+export async function createPendingPersonnel(entry) {
+  if (appConfig.dataSource.mode !== "mysql") {
+    throw new Error("La saisie de personnel necessite la base MySQL.");
+  }
+
+  const connection = await getConnection();
+
+  try {
+    const [insertResult] = await connection.query(
+      [
+        "INSERT INTO rh_personnel_pending",
+        "(",
+        "  civilite, nom, prenom, naissance, pays, fonction, type_personne,",
+        "  entite, tutelle, arrivee, depart, statut, submitted_by_username,",
+        "  glpi_formanswer_id",
+        ")",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)"
+      ].join(" "),
+      [
+        entry.civilite,
+        entry.nom,
+        entry.prenom,
+        entry.naissance || null,
+        entry.pays || null,
+        entry.fonction || null,
+        entry.typePersonne,
+        entry.entite,
+        entry.tutelle || null,
+        entry.arrivee,
+        entry.depart || null,
+        entry.submittedBy,
+        entry.glpiFormanswerId || null
+      ]
+    );
+
+    return { id: insertResult.insertId, ...entry, statut: "en_attente" };
+  } finally {
+    connection.release();
+  }
+}
+
+export async function getPendingPersonnel({ statut, submittedBy } = {}) {
+  if (appConfig.dataSource.mode !== "mysql") {
+    throw new Error("La saisie de personnel necessite la base MySQL.");
+  }
+
+  const conditions = [];
+  const params = [];
+
+  if (statut) {
+    conditions.push("statut = ?");
+    params.push(statut);
+  }
+
+  if (submittedBy) {
+    conditions.push("submitted_by_username = ?");
+    params.push(submittedBy);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  return queryRows(
+    `SELECT * FROM rh_personnel_pending ${whereClause} ORDER BY submitted_at DESC`.trim(),
+    params
+  );
+}
+
+export async function getPendingPersonnelById(id) {
+  if (appConfig.dataSource.mode !== "mysql") {
+    throw new Error("La saisie de personnel necessite la base MySQL.");
+  }
+
+  const rows = await queryRows(
+    "SELECT * FROM rh_personnel_pending WHERE id = ? LIMIT 1",
+    [id]
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function markPendingPersonnelValidated(id, { decidedBy, createdPersonneId }) {
+  if (appConfig.dataSource.mode !== "mysql") {
+    throw new Error("La saisie de personnel necessite la base MySQL.");
+  }
+
+  const currentPool = await getPool();
+  await currentPool.query(
+    [
+      "UPDATE rh_personnel_pending",
+      "SET statut = 'validee', decided_by_username = ?, decided_at = NOW(), created_personne_id = ?",
+      "WHERE id = ?"
+    ].join(" "),
+    [decidedBy, createdPersonneId, id]
+  );
+}
+
+export async function markPendingPersonnelRejected(id, { decidedBy, comment }) {
+  if (appConfig.dataSource.mode !== "mysql") {
+    throw new Error("La saisie de personnel necessite la base MySQL.");
+  }
+
+  const currentPool = await getPool();
+  await currentPool.query(
+    [
+      "UPDATE rh_personnel_pending",
+      "SET statut = 'rejetee', decided_by_username = ?, decided_at = NOW(), decision_comment = ?",
+      "WHERE id = ?"
+    ].join(" "),
+    [decidedBy, comment || null, id]
+  );
+}
+
 function bucketTutelle(tutelle) {
   const normalizedTutelle = String(tutelle ?? "").trim().toLowerCase();
 
@@ -638,6 +859,43 @@ async function readMysqlEffectif() {
       "GROUP BY p.id, p.nom, p.prenom, p.fonction, p.civilite, p.pays, tup.nom, tup.description",
       "ORDER BY p.nom, p.prenom"
     ].join(" ")
+  );
+
+  return rows;
+}
+
+async function readMysqlPhishingCandidates(limit) {
+  const rows = await queryRows(
+    [
+      "SELECT",
+      "  p.id,",
+      "  p.nom,",
+      "  p.prenom,",
+      "  COALESCE(p.civilite, '') AS civilite,",
+      "  COALESCE(p.fonction, '') AS fonction,",
+      "  COALESCE(",
+      "    GROUP_CONCAT(DISTINCT e.nom ORDER BY e.nom SEPARATOR ' | '),",
+      "    ''",
+      "  ) AS entite,",
+      "  COALESCE(",
+      "    MAX(CASE WHEN m.fin IS NULL OR m.fin >= CURDATE() THEN m.email END),",
+      "    ''",
+      "  ) AS email",
+      "FROM personnes AS p",
+      "LEFT JOIN typesPersonnes AS tp ON tp.id = p.typesPersonne_id",
+      "LEFT JOIN personnes_entites AS pe ON pe.personne_id = p.id",
+      "LEFT JOIN entites AS e ON e.id = pe.entite_id",
+      "LEFT JOIN typesEntites AS te ON te.id = e.typesEntite_id",
+      "LEFT JOIN messagerie AS m ON m.personne_id = p.id",
+      "WHERE (p.depart IS NULL OR p.depart >= CURDATE())",
+      "  AND COALESCE(tp.nom, '') <> 'exterieur'",
+      "  AND (e.id IS NULL OR COALESCE(te.nom, '') <> 'exterieur')",
+      "GROUP BY p.id, p.nom, p.prenom, p.civilite, p.fonction",
+      "HAVING COALESCE(email, '') <> ''",
+      "ORDER BY p.nom, p.prenom",
+      "LIMIT ?"
+    ].join(" "),
+    [limit]
   );
 
   return rows;
@@ -927,6 +1185,31 @@ export async function getRhDataset() {
     badges,
     entites
   };
+}
+
+export async function getPhishingCandidates(limit = 50) {
+  const normalizedLimit = Math.max(1, Number(limit) || 50);
+  const mode = appConfig.dataSource.mode.toLowerCase();
+
+  if (mode !== "mysql") {
+    return rhData.effectif
+      .slice(0, normalizedLimit)
+      .map((row, index) => ({
+        id: row.id ?? index + 1,
+        civilite: row.civilite ?? "",
+        nom: row.nom ?? "",
+        prenom: row.prenom ?? "",
+        fonction: row.fonction ?? "",
+        entite: row.entite ?? "",
+        email: `${String(row.prenom ?? "personne")
+          .trim()
+          .toLowerCase()}.${String(row.nom ?? "demo")
+          .trim()
+          .toLowerCase()}@${IECB_MAIL_DOMAIN}`
+      }));
+  }
+
+  return readMysqlPhishingCandidates(normalizedLimit);
 }
 
 export async function getAnnualSnapshotReport(snapshotDate) {

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -74,6 +75,33 @@ function readString(name, fallbackValue) {
   return process.env[name] || fallbackValue;
 }
 
+// RH_AWARENESS_LINK_SECRET signe les liens de suivi (clic/signalement/desinscription)
+// des campagnes de sensibilisation. Un secret par defaut fixe et public permettrait a
+// quiconque connaissant un seul trackingId (visible dans un lien recu) de forger des
+// evenements pour d'autres actions. On refuse donc un secret par defaut en production,
+// et on genere un secret aleatoire ephemere en developpement en avertissant l'operateur.
+function readAwarenessLinkSecret() {
+  const configuredSecret = process.env.RH_AWARENESS_LINK_SECRET;
+
+  if (configuredSecret) {
+    return configuredSecret;
+  }
+
+  if (readString("NODE_ENV", "development") === "production") {
+    throw new Error(
+      "RH_AWARENESS_LINK_SECRET doit etre defini avant de demarrer en production."
+    );
+  }
+
+  console.warn(
+    "[awareness] RH_AWARENESS_LINK_SECRET n'est pas defini : un secret aleatoire " +
+      "temporaire a ete genere pour cette instance (liens invalides apres redemarrage). " +
+      "Definissez cette variable dans .env avant tout usage hors developpement local."
+  );
+
+  return crypto.randomBytes(32).toString("hex");
+}
+
 export const appConfig = {
   port: readNumber("PORT", 3001),
   auth: {
@@ -131,7 +159,7 @@ export const appConfig = {
       .split(",")
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean),
-    linkSecret: readString("RH_AWARENESS_LINK_SECRET", "awareness-link-secret"),
+    linkSecret: readAwarenessLinkSecret(),
     linkTtlHours: readNumber("RH_AWARENESS_LINK_TTL_HOURS", 24 * 45),
     retentionDays: readNumber("RH_AWARENESS_RETENTION_DAYS", 90),
     anonymizeReportsByDefault: readBoolean(
@@ -150,5 +178,30 @@ export const appConfig = {
   },
   publicDashboard: {
     enabled: readBoolean("RH_PUBLIC_DASHBOARD_ENABLED", false)
+  },
+  // Lecture seule des soumissions du formulaire GLPI "Inscription nouvel arrivant"
+  // (plugin Formcreator) pour pre-remplir la saisie RH. Optionnel : sans
+  // RH_GLPI_MYSQL_USER, la fonctionnalite se degrade silencieusement (liste vide).
+  glpi: {
+    host: readString("RH_GLPI_MYSQL_HOST", readString("MYSQL_HOST", "127.0.0.1")),
+    port: readNumber("RH_GLPI_MYSQL_PORT", 3306),
+    user: readString("RH_GLPI_MYSQL_USER", ""),
+    password: readString("RH_GLPI_MYSQL_PASSWORD", ""),
+    database: readString("RH_GLPI_MYSQL_DATABASE", "glpi-9.4.3"),
+    formId: readNumber("RH_GLPI_ARRIVAL_FORM_ID", 1)
+  },
+  smtp: {
+    enabled: readBoolean("RH_SMTP_ENABLED", false),
+    host: readString("RH_SMTP_HOST", ""),
+    port: readNumber("RH_SMTP_PORT", 587),
+    secure: readBoolean("RH_SMTP_SECURE", false),
+    user: readString("RH_SMTP_USER", ""),
+    password: readString("RH_SMTP_PASSWORD", ""),
+    fromEmail: readString("RH_SMTP_FROM_EMAIL", ""),
+    fromName: readString("RH_SMTP_FROM_NAME", "RH Direction"),
+    adminRecipients: readString("RH_SMTP_ADMIN_RECIPIENTS", "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
   }
 };

@@ -2,12 +2,19 @@ import crypto from "node:crypto";
 import express from "express";
 import { appConfig } from "./config.js";
 import {
+  createPendingPersonnel,
   createPersonnel,
   getAnnualSnapshotReport,
   getDataStatus,
+  getGlpiNewArrivalSubmissions,
+  getPendingPersonnel,
+  getPendingPersonnelById,
   getPersonnelTypes,
-  getRhDataset
+  getRhDataset,
+  markPendingPersonnelRejected,
+  markPendingPersonnelValidated
 } from "./data/index.js";
+import { sendMail } from "./mailer.js";
 import {
   createUser,
   hashPassword,
@@ -48,17 +55,27 @@ import {
 import { getCampaignProvider } from "./campaignProvider.js";
 
 const app = express();
+// Derriere le proxy Nginx local (voir docs/DEPLOYMENT.md), fait confiance uniquement
+// au saut loopback pour lire l'adresse IP reelle du client via X-Forwarded-For.
+// Sans ce reglage, request.ip vaut toujours l'adresse loopback de Nginx et les
+// controles bases sur l'IP (isPrivateDashboardRequest) sont valides pour tout le monde.
+app.set("trust proxy", "loopback");
 const port = appConfig.port;
 const sessions = new Map();
 const loginAttempts = new Map();
 const requestWindowBuckets = new Map();
+const passwordResetCodes = new Map();
 const SESSION_TTL_MS = appConfig.auth.sessionTtlMs;
+const PASSWORD_RESET_CODE_TTL_MS = 15 * 60 * 1000;
+const PASSWORD_RULE_MESSAGE =
+  "Le mot de passe doit contenir au moins 8 caracteres, avec au moins une lettre, un chiffre et un caractere special.";
 
 function sanitizeUser(user) {
   return {
     id: user.id,
     username: user.username,
-    role: user.role
+    role: user.role,
+    mustChangePassword: Boolean(user.mustChangePassword)
   };
 }
 
@@ -161,6 +178,15 @@ function normalizeDateInput(value) {
   const normalizedValue = String(value ?? "").trim();
 
   return /^\d{4}-\d{2}-\d{2}$/.test(normalizedValue) ? normalizedValue : "";
+}
+
+function isPasswordValid(password) {
+  return (
+    password.length >= 8 &&
+    /[A-Za-z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+  );
 }
 
 function normalizeCivilite(value) {
@@ -336,6 +362,19 @@ function isPrivateDashboardRequest(request) {
   );
 }
 
+// Defense en profondeur : meme si le filtrage IP echoue ou est mal configure,
+// le dashboard public ne doit jamais exposer l'identite des personnes en depart.
+function buildPublicDashboardPayload(dashboard) {
+  return {
+    ...dashboard,
+    recentDeparts: (dashboard.recentDeparts ?? []).map((depart) => ({
+      id: depart.id,
+      date: depart.date,
+      entite: depart.entite
+    }))
+  };
+}
+
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("X-Frame-Options", "DENY");
@@ -406,6 +445,121 @@ app.post("/api/auth/logout", requireAuth, requireCsrf, (request, response) => {
   response.status(204).end();
 });
 
+// Mot de passe oublie : demande un code envoye par email (l'identifiant doit
+// ressembler a une adresse email, c'est deja la convention pour la plupart des
+// comptes de ce depot). Reponse volontairement generique dans tous les cas
+// (compte inexistant ou non-email) pour ne pas reveler quels identifiants
+// existent. Reutilise le limiteur de tentatives de connexion (meme Map, cle
+// prefixee) pour eviter l'abus d'envoi d'email.
+app.post("/api/auth/request-password-reset", (request, response) => {
+  const username = String(request.body?.username ?? "").trim();
+  const attemptKey = `reset:${getLoginAttemptKey(request, username)}`;
+  const attempt = getLoginAttempt(attemptKey);
+
+  if (attempt.count >= appConfig.auth.login.maxAttempts) {
+    response.status(429).json({ message: "Trop de demandes. Merci de reessayer plus tard." });
+    return;
+  }
+
+  recordFailedLogin(attemptKey);
+
+  const respondGeneric = () =>
+    response.json({
+      message:
+        "Si un compte existe pour cet identifiant, un code de reinitialisation a ete envoye par email."
+    });
+
+  const user = users.find((entry) => entry.username === username);
+
+  if (!user || !username.includes("@")) {
+    respondGeneric();
+    return;
+  }
+
+  const code = String(crypto.randomInt(100000, 1000000));
+  passwordResetCodes.set(username, {
+    code,
+    userId: user.id,
+    expiresAt: Date.now() + PASSWORD_RESET_CODE_TTL_MS,
+    attempts: 0
+  });
+
+  sendMail({
+    to: username,
+    subject: "RH Direction App - Code de reinitialisation de mot de passe",
+    text:
+      `Voici votre code de reinitialisation de mot de passe : ${code}\n` +
+      `Ce code est valable 15 minutes. Si vous n'etes pas a l'origine de cette demande, ignorez cet email.`
+  }).catch((error) => {
+    console.error("[auth/request-password-reset] Echec envoi email:", error.message);
+  });
+
+  respondGeneric();
+});
+
+app.post("/api/auth/reset-password-with-code", (request, response) => {
+  const username = String(request.body?.username ?? "").trim();
+  const code = String(request.body?.code ?? "").trim();
+  const password = String(request.body?.password ?? "");
+  const entry = passwordResetCodes.get(username);
+
+  if (!entry || entry.expiresAt <= Date.now()) {
+    passwordResetCodes.delete(username);
+    response.status(400).json({ message: "Code invalide ou expire." });
+    return;
+  }
+
+  entry.attempts += 1;
+
+  if (entry.attempts > 5) {
+    passwordResetCodes.delete(username);
+    response.status(400).json({ message: "Trop de tentatives, redemandez un code." });
+    return;
+  }
+
+  if (entry.code !== code) {
+    response.status(400).json({ message: "Code invalide ou expire." });
+    return;
+  }
+
+  if (!isPasswordValid(password)) {
+    response.status(400).json({ message: PASSWORD_RULE_MESSAGE });
+    return;
+  }
+
+  const user = updateUserPassword(entry.userId, hashPassword(password), {
+    requireChange: false
+  });
+  passwordResetCodes.delete(username);
+  revokeUserSessions(user.id);
+
+  response.json({ message: "Mot de passe modifie. Vous pouvez vous connecter." });
+});
+
+// Changement de mot de passe volontaire par l'utilisateur lui-meme (notamment
+// pour lever mustChangePassword apres une creation de compte ou une
+// reinitialisation admin). Pas de verification de l'ancien mot de passe : la
+// session authentifiee suffit, meme logique que la reinitialisation admin.
+app.post("/api/auth/change-password", requireAuth, requireCsrf, (request, response) => {
+  const password = String(request.body?.password ?? "");
+
+  if (!isPasswordValid(password)) {
+    response.status(400).json({ message: PASSWORD_RULE_MESSAGE });
+    return;
+  }
+
+  const user = updateUserPassword(request.user.id, hashPassword(password), {
+    requireChange: false
+  });
+
+  // La session en memoire garde sa propre copie de l'utilisateur (sanitizeUser
+  // au login) : la rafraichir pour que mustChangePassword reflete le changement
+  // sans attendre une reconnexion.
+  request.session.user = sanitizeUser(user);
+
+  response.json({ user: request.session.user });
+});
+
 app.get(
   "/api/admin/users",
   requireAuth,
@@ -432,10 +586,8 @@ app.post(
       return;
     }
 
-    if (password.length < 6) {
-      response
-        .status(400)
-        .json({ message: "Le mot de passe doit contenir au moins 6 caracteres." });
+    if (!isPasswordValid(password)) {
+      response.status(400).json({ message: PASSWORD_RULE_MESSAGE });
       return;
     }
 
@@ -479,10 +631,8 @@ app.patch(
       return;
     }
 
-    if (password.length < 6) {
-      response
-        .status(400)
-        .json({ message: "Le mot de passe doit contenir au moins 6 caracteres." });
+    if (!isPasswordValid(password)) {
+      response.status(400).json({ message: PASSWORD_RULE_MESSAGE });
       return;
     }
 
@@ -597,6 +747,208 @@ app.post(
   }
 );
 
+// Un operateur_saisie peut saisir un nouvel arrivant mais pas l'enregistrer
+// directement : la saisie part dans rh_personnel_pending, un email previent les
+// admins, qui valident (creation reelle via createPersonnel, comme /api/admin/personnel)
+// ou rejettent (rien n'est cree). admin/operateur peuvent aussi saisir par ce
+// chemin (utile s'ils veulent qu'un autre admin/operateur revalide une saisie).
+app.post(
+  "/api/personnel/pending",
+  requireAuth,
+  requireRole(["admin", "operateur", "operateur_saisie"]),
+  requireCsrf,
+  async (request, response) => {
+    const civilite = normalizeCivilite(request.body?.civilite);
+    const nom = normalizeUpperText(request.body?.nom);
+    const prenom = normalizePrenom(request.body?.prenom);
+    const naissance = normalizeDateInput(request.body?.naissance);
+    const pays = normalizeUpperText(
+      request.body?.paysLibre || request.body?.pays || ""
+    );
+    const fonction = normalizeUpperText(
+      request.body?.fonctionLibre || request.body?.fonction || ""
+    );
+    const typePersonne = String(request.body?.typePersonne ?? "").trim();
+    const entite = String(request.body?.entite ?? "").trim();
+    const tutelle = String(request.body?.tutelle ?? "").trim();
+    const arrivee = normalizeDateInput(request.body?.arrivee);
+    const isPermanent = request.body?.permanent !== false;
+    const depart = isPermanent ? "" : normalizeDateInput(request.body?.depart);
+
+    if (!civilite) {
+      response.status(400).json({ message: "Civilite invalide." });
+      return;
+    }
+
+    if (!nom || !prenom) {
+      response.status(400).json({ message: "Nom et prenom sont obligatoires." });
+      return;
+    }
+
+    if (!entite) {
+      response.status(400).json({ message: "Entite obligatoire." });
+      return;
+    }
+
+    if (!arrivee) {
+      response.status(400).json({ message: "Date d'arrivee obligatoire." });
+      return;
+    }
+
+    if (!isPermanent && !depart) {
+      response.status(400).json({ message: "Date de depart obligatoire." });
+      return;
+    }
+
+    try {
+      const pending = await createPendingPersonnel({
+        civilite,
+        nom,
+        prenom,
+        naissance,
+        pays,
+        fonction,
+        typePersonne,
+        entite,
+        tutelle,
+        arrivee,
+        depart,
+        submittedBy: request.user.username,
+        glpiFormanswerId: request.body?.glpiFormanswerId
+          ? Number(request.body.glpiFormanswerId)
+          : null
+      });
+
+      sendMail({
+        to: appConfig.smtp.adminRecipients,
+        subject: "RH - Nouvelle saisie a valider",
+        text:
+          `${request.user.username} a saisi un nouvel arrivant a valider : ` +
+          `${prenom} ${nom} (${fonction || "fonction non renseignee"}, ${entite}).\n` +
+          `A valider ou rejeter depuis /admin?section=saisie.`
+      }).catch((error) => {
+        console.error("[personnel/pending] Echec envoi email admins:", error.message);
+      });
+
+      response.status(201).json(pending);
+    } catch (error) {
+      const statusCode = error.message === "Entite introuvable." ? 400 : 500;
+      const message = statusCode === 400 ? error.message : "Erreur serveur.";
+      response.status(statusCode).json({ message });
+    }
+  }
+);
+
+app.get(
+  "/api/personnel/pending",
+  requireAuth,
+  requireRole(["admin", "operateur", "operateur_saisie"]),
+  async (request, response) => {
+    try {
+      const submittedBy =
+        request.user.role === "operateur_saisie" ? request.user.username : undefined;
+
+      response.json(await getPendingPersonnel({ submittedBy }));
+    } catch {
+      sendServerError(response);
+    }
+  }
+);
+
+app.get(
+  "/api/personnel/glpi-arrivals",
+  requireAuth,
+  requireRole(["admin", "operateur", "operateur_saisie"]),
+  async (_request, response) => {
+    try {
+      response.json(await getGlpiNewArrivalSubmissions());
+    } catch (error) {
+      console.error("[personnel/glpi-arrivals] Erreur:", error.message);
+      response.json([]);
+    }
+  }
+);
+
+app.post(
+  "/api/personnel/pending/:id/validate",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  async (request, response) => {
+    try {
+      const pending = await getPendingPersonnelById(request.params.id);
+
+      if (!pending) {
+        response.status(404).json({ message: "Saisie introuvable." });
+        return;
+      }
+
+      if (pending.statut !== "en_attente") {
+        response.status(400).json({ message: "Cette saisie a deja ete traitee." });
+        return;
+      }
+
+      const personnel = await createPersonnel({
+        civilite: pending.civilite,
+        nom: pending.nom,
+        prenom: pending.prenom,
+        naissance: pending.naissance,
+        pays: pending.pays,
+        fonction: pending.fonction,
+        typePersonne: pending.type_personne,
+        entite: pending.entite,
+        tutelle: pending.tutelle,
+        arrivee: pending.arrivee,
+        depart: pending.depart,
+        userid: buildPersonnelUserId(pending.prenom, pending.nom),
+        password: generatePersonnelPassword()
+      });
+
+      await markPendingPersonnelValidated(pending.id, {
+        decidedBy: request.user.username,
+        createdPersonneId: personnel.id
+      });
+
+      response.json({ id: pending.id, statut: "validee", personnelId: personnel.id });
+    } catch (error) {
+      const statusCode = error.message === "Entite introuvable." ? 400 : 500;
+      const message = statusCode === 400 ? error.message : "Erreur serveur.";
+      response.status(statusCode).json({ message });
+    }
+  }
+);
+
+app.post(
+  "/api/personnel/pending/:id/reject",
+  requireAuth,
+  requireRole(["admin", "operateur"]),
+  requireCsrf,
+  async (request, response) => {
+    try {
+      const pending = await getPendingPersonnelById(request.params.id);
+
+      if (!pending) {
+        response.status(404).json({ message: "Saisie introuvable." });
+        return;
+      }
+
+      if (pending.statut !== "en_attente") {
+        response.status(400).json({ message: "Cette saisie a deja ete traitee." });
+        return;
+      }
+
+      await markPendingPersonnelRejected(pending.id, {
+        decidedBy: request.user.username,
+        comment: String(request.body?.comment ?? "").trim()
+      });
+
+      response.json({ id: pending.id, statut: "rejetee" });
+    } catch {
+      sendServerError(response);
+    }
+  }
+);
+
 app.get("/api/dashboard", requireAuth, async (_request, response) => {
   try {
     const dataset = await getRhDataset();
@@ -614,7 +966,7 @@ app.get("/api/public/dashboard", async (request, response) => {
 
   try {
     const dataset = await getRhDataset();
-    response.json(dataset.dashboard);
+    response.json(buildPublicDashboardPayload(dataset.dashboard));
   } catch {
     sendServerError(response);
   }

@@ -81,7 +81,9 @@ function formatCellValue(column, row) {
   return value;
 }
 
-export default function DataTable({ columns, data }) {
+export default function DataTable({ columns, data, renderRowActions }) {
+  const columnCount = columns.length + (renderRowActions ? 1 : 0);
+
   return (
     <div className="table-wrapper rh-table-wrapper">
       <table className="data-table rh-table">
@@ -90,6 +92,7 @@ export default function DataTable({ columns, data }) {
             {columns.map((column) => (
               <th key={column.key}>{column.label}</th>
             ))}
+            {renderRowActions ? <th>Actions</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -99,11 +102,12 @@ export default function DataTable({ columns, data }) {
                 {columns.map((column) => (
                   <td key={column.key}>{formatCellValue(column, row)}</td>
                 ))}
+                {renderRowActions ? <td>{renderRowActions(row)}</td> : null}
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={columns.length}>{`Aucune donn\u00e9e disponible`}</td>
+              <td colSpan={columnCount}>{`Aucune donn\u00e9e disponible`}</td>
             </tr>
           )}
         </tbody>

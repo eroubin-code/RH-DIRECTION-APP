@@ -19,8 +19,13 @@ tar \
   --exclude=dist \
   --exclude=.git \
   --exclude=.env \
+  --exclude=server/data/users.store.json \
+  --exclude=server/data/awareness-campaigns.store.json \
+  --exclude=server/data/awareness-outbox.store.json \
   -czf /tmp/rh-direction-app-update.tgz .
 ```
+
+⚠️ Ces fichiers `*.store.json` contiennent l'etat vivant de la production (comptes utilisateurs, campagnes de sensibilisation en cours) — ils divergent forcement du poste local et **ne doivent jamais etre ecrases par un deploiement**. Un oubli ici a deja provoque un incident (mot de passe admin ecrase par le hash local lors d'un deploiement).
 
 ## Envoyer l'archive
 
@@ -70,6 +75,7 @@ server {
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
     add_header X-Content-Type-Options "nosniff" always;
@@ -84,3 +90,5 @@ Apres modification Nginx :
 nginx -t
 systemctl reload nginx
 ```
+
+`X-Forwarded-For` est indispensable : le backend (`app.set("trust proxy", "loopback")` dans `server/index.js`) s'en sert pour retrouver l'IP reelle du client derriere Nginx, notamment pour le controle d'acces du dashboard public. Sans cet en-tete, toutes les requetes apparaissent comme venant de `127.0.0.1`.

@@ -76,11 +76,14 @@ export async function runArrivalNotifierCheck() {
 
   for (const submission of fresh) {
     const name = `${submission.prenom || ""} ${submission.nom || ""}`.trim();
+    const equipe = String(submission.entite || "").trim();
 
     try {
       await sendMail({
         to: config.recipients,
-        subject: `Nouvel arrivant a saisir dans RH Direction App${name ? ` - ${name}` : ""}`,
+        subject:
+          `Nouvel arrivant a saisir dans RH Direction App` +
+          `${name ? ` - ${name}` : ""}${equipe ? ` (${equipe})` : ""}`,
         text: buildBody(submission)
       });
       notified.add(Number(submission.glpiFormanswerId));

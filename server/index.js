@@ -912,6 +912,7 @@ async function sendFicheArrivee(pending) {
   }
 
   const nom = `${pending.prenom ?? ""} ${pending.nom ?? ""}`.trim();
+  const equipe = String(pending.entite ?? "").trim();
   const slug =
     `${pending.nom ?? ""}-${pending.prenom ?? ""}`
       .toLowerCase()
@@ -922,7 +923,7 @@ async function sendFicheArrivee(pending) {
 
   await sendMail({
     to: appConfig.ficheArrivee.recipients,
-    subject: `Fiche d'arrivee - ${nom}`,
+    subject: `Fiche d'arrivee - ${nom}${equipe ? ` (${equipe})` : ""}`,
     text: [
       `La saisie de ${nom} a ete validee dans RH Direction App.`,
       "",

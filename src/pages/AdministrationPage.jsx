@@ -35,6 +35,157 @@ const PENDING_STATUS_LABELS = {
   rejetee: "Rejetée"
 };
 
+// Formate une date SQL (DATE "2026-09-01" ou DATETIME "2026-09-01 15:10:00")
+// pour l'affichage dans la fenetre de revue. Renvoie la valeur brute si elle
+// n'est pas interpretable, "—" si vide.
+function formatFrDateTime(value) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return "—";
+  }
+
+  const hasTime = /[ T]\d{2}:\d{2}/.test(raw);
+  const isoish = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(hasTime ? isoish : `${isoish}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return raw;
+  }
+
+  return new Intl.DateTimeFormat(
+    "fr-FR",
+    hasTime ? { dateStyle: "short", timeStyle: "short" } : { dateStyle: "short" }
+  ).format(date);
+}
+
+// Fenetre de revue d'une saisie en attente : recapitule tous les champs saisis
+// (y compris ceux absents du tableau) avant que l'admin ne valide ou rejette.
+function PendingReviewModal({
+  entry,
+  canDecide,
+  deciding,
+  rejectComment,
+  onRejectCommentChange,
+  feedbackError,
+  onValidate,
+  onReject,
+  onClose
+}) {
+  const rows = [
+    ["Civilité", entry.civilite || "—"],
+    ["Nom", entry.nom || "—"],
+    ["Prénom", entry.prenom || "—"],
+    ["Date de naissance", formatFrDateTime(entry.naissance)],
+    ["Pays de naissance", entry.pays || "—"],
+    ["Fonction", entry.fonction || "—"],
+    ["Type de personnel", entry.type_personne || "—"],
+    ["Entité", entry.entite || "—"],
+    ["Tutelle", entry.tutelle || "—"],
+    ["Date d'arrivée", formatFrDateTime(entry.arrivee)],
+    [
+      "Date de départ",
+      entry.depart ? formatFrDateTime(entry.depart) : "Personnel permanent"
+    ],
+    ["Statut", PENDING_STATUS_LABELS[entry.statut] ?? entry.statut],
+    ["Saisi par", entry.submitted_by_username || "—"],
+    ["Soumis le", formatFrDateTime(entry.submitted_at)],
+    [
+      "Origine",
+      entry.glpi_formanswer_id
+        ? `Formulaire GLPI #${entry.glpi_formanswer_id}`
+        : "Saisie manuelle"
+    ]
+  ];
+
+  if (entry.statut !== "en_attente") {
+    rows.push(["Décidé par", entry.decided_by_username || "—"]);
+    rows.push(["Décidé le", formatFrDateTime(entry.decided_at)]);
+
+    if (entry.decision_comment) {
+      rows.push(["Commentaire", entry.decision_comment]);
+    }
+  }
+
+  const canAct = canDecide && entry.statut === "en_attente";
+
+  return (
+    <div className="admin-review-overlay" onClick={onClose} role="presentation">
+      <div
+        aria-labelledby="admin-review-title"
+        aria-modal="true"
+        className="admin-review-modal"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="admin-review-head">
+          <h4 id="admin-review-title">
+            Revue de la saisie — {entry.prenom} {entry.nom}
+          </h4>
+          <button
+            aria-label="Fermer"
+            className="admin-review-close"
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <dl className="admin-review-grid">
+          {rows.map(([label, value]) => (
+            <div className="admin-review-row" key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {canAct ? (
+          <div className="admin-review-actions">
+            {feedbackError ? (
+              <p className="admin-feedback error">{feedbackError}</p>
+            ) : null}
+            <label className="admin-field">
+              <span>Motif de rejet (optionnel)</span>
+              <input
+                disabled={deciding}
+                onChange={(event) => onRejectCommentChange(event.target.value)}
+                type="text"
+                value={rejectComment}
+              />
+            </label>
+            <div className="admin-review-buttons">
+              <button
+                className="btn-primary admin-submit"
+                disabled={deciding}
+                onClick={onValidate}
+                type="button"
+              >
+                {deciding ? "Traitement..." : "Valider et créer le personnel"}
+              </button>
+              <button
+                className="admin-review-reject"
+                disabled={deciding}
+                onClick={onReject}
+                type="button"
+              >
+                Rejeter
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="admin-form-hint">
+            {canDecide
+              ? "Cette saisie a déjà été traitée."
+              : "Lecture seule — la validation est réservée aux administrateurs."}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const initialForm = {
   username: "",
   password: "",
@@ -72,6 +223,7 @@ export default function AdministrationPage({ currentUser }) {
   const [glpiArrivals, setGlpiArrivals] = useState([]);
   const [prefillData, setPrefillData] = useState(null);
   const [prefillKey, setPrefillKey] = useState(0);
+  const [reviewEntry, setReviewEntry] = useState(null);
 
   const isEntryOnlyRole = currentUser?.role === "operateur_saisie";
   const canDecidePending = currentUser?.role === "admin" || currentUser?.role === "operateur";
@@ -107,6 +259,35 @@ export default function AdministrationPage({ currentUser }) {
       loadGlpiArrivals();
     }
   }, [effectiveSection]);
+
+  // Fermeture de la fenetre de revue au clavier (Echap).
+  useEffect(() => {
+    if (!reviewEntry) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setReviewEntry(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reviewEntry]);
+
+  // La saisie affichee dans la fenetre de revue suit la liste rechargee
+  // (statut mis a jour apres validation/rejet) et disparait si elle n'existe plus.
+  useEffect(() => {
+    if (!reviewEntry) {
+      return;
+    }
+
+    const refreshed = pendingEntries.find((entry) => entry.id === reviewEntry.id);
+    if (refreshed && refreshed !== reviewEntry) {
+      setReviewEntry(refreshed);
+    }
+  }, [pendingEntries, reviewEntry]);
 
   function handlePrefillFromGlpi(submission) {
     setPrefillData(submission);
@@ -352,6 +533,7 @@ export default function AdministrationPage({ currentUser }) {
     try {
       await validatePendingPersonnel(id);
       setMessage("Saisie validee, le personnel a ete cree.");
+      setReviewEntry(null);
       loadPendingPersonnel();
     } catch (requestError) {
       setError(requestError.message);
@@ -369,6 +551,7 @@ export default function AdministrationPage({ currentUser }) {
     try {
       await rejectPendingPersonnel(id, rejectComments[id] ?? "");
       setMessage("Saisie rejetee.");
+      setReviewEntry(null);
       setRejectComments((previous) => {
         const next = { ...previous };
         delete next[id];
@@ -975,48 +1158,37 @@ export default function AdministrationPage({ currentUser }) {
                   ...entry,
                   statutLabel: PENDING_STATUS_LABELS[entry.statut] ?? entry.statut
                 }))}
-                renderRowActions={
-                  canDecidePending
-                    ? (row) =>
-                        row.statut === "en_attente" ? (
-                          <div className="admin-pending-actions">
-                            <button
-                              className="btn-primary admin-submit"
-                              disabled={decidingPendingId === row.id}
-                              onClick={() => handleValidatePending(row.id)}
-                              type="button"
-                            >
-                              Valider
-                            </button>
-                            <input
-                              aria-label="Motif de rejet"
-                              disabled={decidingPendingId === row.id}
-                              onChange={(event) =>
-                                setRejectComments((previous) => ({
-                                  ...previous,
-                                  [row.id]: event.target.value
-                                }))
-                              }
-                              placeholder="Motif de rejet (optionnel)"
-                              type="text"
-                              value={rejectComments[row.id] ?? ""}
-                            />
-                            <button
-                              disabled={decidingPendingId === row.id}
-                              onClick={() => handleRejectPending(row.id)}
-                              type="button"
-                            >
-                              Rejeter
-                            </button>
-                          </div>
-                        ) : (
-                          row.decision_comment || "—"
-                        )
-                    : undefined
-                }
+                renderRowActions={(row) => (
+                  <button
+                    className="btn-primary admin-submit"
+                    onClick={() => setReviewEntry(row)}
+                    type="button"
+                  >
+                    Examiner
+                  </button>
+                )}
               />
             </div>
           </div>
+
+          {reviewEntry ? (
+            <PendingReviewModal
+              canDecide={canDecidePending}
+              deciding={decidingPendingId === reviewEntry.id}
+              entry={reviewEntry}
+              feedbackError={feedbackTarget === "saisie" ? error : ""}
+              onClose={() => setReviewEntry(null)}
+              onReject={() => handleRejectPending(reviewEntry.id)}
+              onRejectCommentChange={(value) =>
+                setRejectComments((previous) => ({
+                  ...previous,
+                  [reviewEntry.id]: value
+                }))
+              }
+              onValidate={() => handleValidatePending(reviewEntry.id)}
+              rejectComment={rejectComments[reviewEntry.id] ?? ""}
+            />
+          ) : null}
         </div>
       ) : null}
 

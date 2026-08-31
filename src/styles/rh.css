@@ -1145,6 +1145,121 @@
   font-size: 14px;
 }
 
+/* Fenetre de revue d'une saisie en attente (onglet "Saisie arrivants"). */
+.admin-review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 32, 55, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.admin-review-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e5eaf0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(15, 32, 55, 0.28);
+}
+
+.admin-review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-review-head h4 {
+  margin: 0;
+  color: var(--text-dark);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.admin-review-close {
+  border: none;
+  background: transparent;
+  padding: 0 4px;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+
+.admin-review-grid {
+  margin: 0;
+  border: 1px solid #e5eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.admin-review-row {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.admin-review-row:nth-child(odd) {
+  background: #f6f9fc;
+}
+
+.admin-review-row dt {
+  margin: 0;
+  color: #5a6b80;
+  font-weight: 700;
+}
+
+.admin-review-row dd {
+  margin: 0;
+  color: var(--text-dark);
+  word-break: break-word;
+}
+
+.admin-review-actions {
+  margin-top: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-review-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-review-reject {
+  border: 1px solid #d8452f;
+  border-radius: 999px;
+  background: #fff;
+  padding: 10px 22px;
+  font-weight: 800;
+  color: #d8452f;
+  cursor: pointer;
+}
+
+.admin-review-reject:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .admin-review-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
 .admin-personnel-form {
   gap: 24px;
 }

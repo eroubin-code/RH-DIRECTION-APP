@@ -146,8 +146,31 @@ export async function getGlpiNewArrivalSubmissions() {
     }
   }
 
+  // On ne propose que les arrivees encore a venir (date d'arrivee >= aujourd'hui) :
+  // les demandes GLPI dont la date est deja passee ne sont plus a importer. Une
+  // date illisible est conservee par prudence (on ne masque pas ce qu'on ne sait
+  // pas evaluer).
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  function isPastArrival(value) {
+    const raw = String(value ?? "").trim();
+    let date = null;
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      date = new Date(`${raw.slice(0, 10)}T00:00:00`);
+    } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+      const [day, month, year] = raw.split("/");
+      date = new Date(`${year}-${month}-${day}T00:00:00`);
+    }
+
+    return Boolean(date) && !Number.isNaN(date.getTime()) && date < startOfToday;
+  }
+
   return [...submissionsById.values()].filter(
-    (submission) => !alreadyImportedIds.has(Number(submission.glpiFormanswerId))
+    (submission) =>
+      !alreadyImportedIds.has(Number(submission.glpiFormanswerId)) &&
+      !isPastArrival(submission.arrivee)
   );
 }
 

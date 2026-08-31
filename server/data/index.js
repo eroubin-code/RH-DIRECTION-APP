@@ -504,10 +504,10 @@ export async function createPendingPersonnel(entry) {
         "INSERT INTO rh_personnel_pending",
         "(",
         "  civilite, nom, prenom, naissance, pays, fonction, type_personne,",
-        "  entite, tutelle, arrivee, depart, statut, submitted_by_username,",
-        "  glpi_formanswer_id",
+        "  entite, tutelle, arrivee, depart, badge_demande, numero_badge,",
+        "  statut, submitted_by_username, glpi_formanswer_id",
         ")",
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)"
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)"
       ].join(" "),
       [
         entry.civilite,
@@ -521,6 +521,8 @@ export async function createPendingPersonnel(entry) {
         entry.tutelle || null,
         entry.arrivee,
         entry.depart || null,
+        entry.badgeDemande ? 1 : 0,
+        entry.numeroBadge || null,
         entry.submittedBy,
         entry.glpiFormanswerId || null
       ]

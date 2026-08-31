@@ -87,6 +87,11 @@ function PendingReviewModal({
       "Date de départ",
       entry.depart ? formatFrDateTime(entry.depart) : "Personnel permanent"
     ],
+    ["Badge demandé", entry.badge_demande ? "Oui" : "Non"],
+    [
+      "Numéro de badge",
+      entry.numero_badge || (entry.badge_demande ? "à attribuer" : "—")
+    ],
     ["Statut", PENDING_STATUS_LABELS[entry.statut] ?? entry.statut],
     ["Saisi par", entry.submitted_by_username || "—"],
     ["Soumis le", formatFrDateTime(entry.submitted_at)],
@@ -208,6 +213,7 @@ export default function AdministrationPage({ currentUser }) {
   const [paysNaissance, setPaysNaissance] = useState([]);
   const [isPersonnelPermanent, setIsPersonnelPermanent] = useState(false);
   const [isPendingPermanent, setIsPendingPermanent] = useState(false);
+  const [isPendingBadge, setIsPendingBadge] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [passwordResetForm, setPasswordResetForm] = useState(initialPasswordResetForm);
   const [message, setMessage] = useState("");
@@ -503,6 +509,8 @@ export default function AdministrationPage({ currentUser }) {
       arrivee: formData.get("arrivee"),
       permanent: isPendingPermanent,
       depart: isPendingPermanent ? "" : formData.get("depart"),
+      badgeDemande: isPendingBadge,
+      numeroBadge: isPendingBadge ? formData.get("numeroBadge") : "",
       glpiFormanswerId: prefillData?.glpiFormanswerId ?? null
     };
 
@@ -510,6 +518,7 @@ export default function AdministrationPage({ currentUser }) {
       const pending = await submitPendingPersonnel(payload);
       formElement?.reset?.();
       setIsPendingPermanent(false);
+      setIsPendingBadge(false);
       setPrefillData(null);
       setPrefillKey((previous) => previous + 1);
       setPendingEntries((previous) => [pending, ...previous]);
@@ -1150,6 +1159,46 @@ export default function AdministrationPage({ currentUser }) {
                   <label className="admin-field">
                     <span>Date de départ</span>
                     <input defaultValue={prefillData?.depart ?? ""} name="depart" required type="date" />
+                  </label>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="admin-form-section">
+              <h5>Contrôle d'accès</h5>
+              <div className="admin-form-grid">
+                <fieldset className="admin-radio-group">
+                  <legend>Badge demandé</legend>
+                  <label>
+                    <input
+                      checked={isPendingBadge}
+                      name="badgeDemande"
+                      onChange={() => setIsPendingBadge(true)}
+                      type="radio"
+                      value="oui"
+                    />
+                    <span>Oui</span>
+                  </label>
+                  <label>
+                    <input
+                      checked={!isPendingBadge}
+                      name="badgeDemande"
+                      onChange={() => setIsPendingBadge(false)}
+                      type="radio"
+                      value="non"
+                    />
+                    <span>Non</span>
+                  </label>
+                </fieldset>
+                {isPendingBadge ? (
+                  <label className="admin-field">
+                    <span>Numéro de badge (si connu)</span>
+                    <input
+                      maxLength={50}
+                      name="numeroBadge"
+                      placeholder="Laisser vide si non attribué"
+                      type="text"
+                    />
                   </label>
                 ) : null}
               </div>

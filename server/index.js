@@ -800,6 +800,11 @@ app.post(
       return;
     }
 
+    const badgeDemande = request.body?.badgeDemande === true;
+    const numeroBadge = badgeDemande
+      ? String(request.body?.numeroBadge ?? "").trim().slice(0, 50)
+      : "";
+
     try {
       const pending = await createPendingPersonnel({
         civilite,
@@ -813,6 +818,8 @@ app.post(
         tutelle,
         arrivee,
         depart,
+        badgeDemande,
+        numeroBadge,
         submittedBy: request.user.username,
         glpiFormanswerId: request.body?.glpiFormanswerId
           ? Number(request.body.glpiFormanswerId)
@@ -825,6 +832,11 @@ app.post(
         text:
           `${request.user.username} a saisi un nouvel arrivant a valider : ` +
           `${prenom} ${nom} (${fonction || "fonction non renseignee"}, ${entite}).\n` +
+          `Controle d'acces : ${
+            badgeDemande
+              ? `badge demande${numeroBadge ? ` (n° ${numeroBadge})` : ""}`
+              : "pas de badge demande"
+          }.\n` +
           `A valider ou rejeter depuis /admin?section=saisie.`
       }).catch((error) => {
         console.error("[personnel/pending] Echec envoi email admins:", error.message);

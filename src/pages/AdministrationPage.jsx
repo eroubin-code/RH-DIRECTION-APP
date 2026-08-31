@@ -65,6 +65,7 @@ function PendingReviewModal({
   entry,
   canDecide,
   deciding,
+  contactLabel,
   rejectComment,
   onRejectCommentChange,
   feedbackError,
@@ -80,6 +81,7 @@ function PendingReviewModal({
     ["Pays de naissance", entry.pays || "—"],
     ["Fonction", entry.fonction || "—"],
     ["Type de personnel", entry.type_personne || "—"],
+    ["Contact (référent)", contactLabel || "—"],
     ["Entité", entry.entite || "—"],
     ["Tutelle", entry.tutelle || "—"],
     ["Date d'arrivée", formatFrDateTime(entry.arrivee)],
@@ -207,6 +209,7 @@ export default function AdministrationPage({ currentUser }) {
   const [searchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [entites, setEntites] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [fonctions, setFonctions] = useState([]);
   const [personnelTypes, setPersonnelTypes] = useState([]);
   const [tutelles, setTutelles] = useState([]);
@@ -362,9 +365,20 @@ export default function AdministrationPage({ currentUser }) {
           )
         ].sort((left, right) => left.localeCompare(right));
 
+        const normalizedContacts = data
+          .filter((personnel) => personnel.id)
+          .map((personnel) => ({
+            id: personnel.id,
+            label: `${String(personnel.nom ?? "").trim()} ${String(
+              personnel.prenom ?? ""
+            ).trim()}`.trim()
+          }))
+          .sort((left, right) => left.label.localeCompare(right.label));
+
         setFonctions(normalizedFonctions);
         setTutelles(normalizedTutelles);
         setPaysNaissance(normalizedPays);
+        setContacts(normalizedContacts);
       })
       .catch((requestError) => {
         setFeedbackTarget("page");
@@ -511,6 +525,7 @@ export default function AdministrationPage({ currentUser }) {
       depart: isPendingPermanent ? "" : formData.get("depart"),
       badgeDemande: isPendingBadge,
       numeroBadge: isPendingBadge ? formData.get("numeroBadge") : "",
+      contactPersonneId: formData.get("contactPersonneId") || null,
       glpiFormanswerId: prefillData?.glpiFormanswerId ?? null
     };
 
@@ -826,7 +841,7 @@ export default function AdministrationPage({ currentUser }) {
                 </label>
                 <label className="admin-field">
                   <span>Type de personnel</span>
-                  <select defaultValue="employe" name="typePersonne" required>
+                  <select defaultValue="agent" name="typePersonne" required>
                     {personnelTypes.length > 0 ? (
                       personnelTypes.map((typePersonne) => (
                         <option key={typePersonne.id} value={typePersonne.nom}>
@@ -834,7 +849,7 @@ export default function AdministrationPage({ currentUser }) {
                         </option>
                       ))
                     ) : (
-                      <option value="employe">Employe</option>
+                      <option value="agent">Agent</option>
                     )}
                   </select>
                 </label>
@@ -1090,7 +1105,7 @@ export default function AdministrationPage({ currentUser }) {
                 </label>
                 <label className="admin-field">
                   <span>Type de personnel</span>
-                  <select defaultValue="employe" name="typePersonne" required>
+                  <select defaultValue="agent" name="typePersonne" required>
                     {personnelTypes.length > 0 ? (
                       personnelTypes.map((typePersonne) => (
                         <option key={typePersonne.id} value={typePersonne.nom}>
@@ -1098,8 +1113,19 @@ export default function AdministrationPage({ currentUser }) {
                         </option>
                       ))
                     ) : (
-                      <option value="employe">Employe</option>
+                      <option value="agent">Agent</option>
                     )}
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span>Contact (référent)</span>
+                  <select defaultValue="" name="contactPersonneId">
+                    <option value="">Aucun</option>
+                    {contacts.map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="admin-field">
@@ -1224,6 +1250,12 @@ export default function AdministrationPage({ currentUser }) {
           {reviewEntry ? (
             <PendingReviewModal
               canDecide={canDecidePending}
+              contactLabel={
+                contacts.find(
+                  (contact) =>
+                    String(contact.id) === String(reviewEntry.contact_personne_id)
+                )?.label
+              }
               deciding={decidingPendingId === reviewEntry.id}
               entry={reviewEntry}
               feedbackError={feedbackTarget === "saisie" ? error : ""}

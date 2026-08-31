@@ -804,6 +804,7 @@ app.post(
     const numeroBadge = badgeDemande
       ? String(request.body?.numeroBadge ?? "").trim().slice(0, 50)
       : "";
+    const contactPersonneId = Number(request.body?.contactPersonneId) || null;
 
     try {
       const pending = await createPendingPersonnel({
@@ -820,6 +821,7 @@ app.post(
         depart,
         badgeDemande,
         numeroBadge,
+        contactPersonneId,
         submittedBy: request.user.username,
         glpiFormanswerId: request.body?.glpiFormanswerId
           ? Number(request.body.glpiFormanswerId)
@@ -912,6 +914,7 @@ app.post(
         tutelle: pending.tutelle,
         arrivee: pending.arrivee,
         depart: pending.depart,
+        contactPersonneId: pending.contact_personne_id || null,
         userid: buildPersonnelUserId(pending.prenom, pending.nom),
         password: generatePersonnelPassword()
       });

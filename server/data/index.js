@@ -428,7 +428,7 @@ export async function createPersonnel(personnel) {
         "  fonction, arrivee, depart, userid, mdp, typesPersonne_id,",
         "  contact_personne_id",
         ")",
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ].join(" "),
       [
         personnel.civilite,
@@ -442,7 +442,8 @@ export async function createPersonnel(personnel) {
         personnel.depart || null,
         uniqueUserId,
         personnel.password,
-        typePersonneId
+        typePersonneId,
+        personnel.contactPersonneId || null
       ]
     );
 
@@ -505,9 +506,9 @@ export async function createPendingPersonnel(entry) {
         "(",
         "  civilite, nom, prenom, naissance, pays, fonction, type_personne,",
         "  entite, tutelle, arrivee, depart, badge_demande, numero_badge,",
-        "  statut, submitted_by_username, glpi_formanswer_id",
+        "  contact_personne_id, statut, submitted_by_username, glpi_formanswer_id",
         ")",
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)"
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)"
       ].join(" "),
       [
         entry.civilite,
@@ -523,6 +524,7 @@ export async function createPendingPersonnel(entry) {
         entry.depart || null,
         entry.badgeDemande ? 1 : 0,
         entry.numeroBadge || null,
+        entry.contactPersonneId || null,
         entry.submittedBy,
         entry.glpiFormanswerId || null
       ]

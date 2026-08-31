@@ -22,6 +22,7 @@ tar \
   --exclude=server/data/users.store.json \
   --exclude=server/data/awareness-campaigns.store.json \
   --exclude=server/data/awareness-outbox.store.json \
+  --exclude=server/data/arrival-notify.store.json \
   -czf /tmp/rh-direction-app-update.tgz .
 ```
 

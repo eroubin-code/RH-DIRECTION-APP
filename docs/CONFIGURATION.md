@@ -131,6 +131,16 @@ Le backend interroge MySQL via `mysql2`.
 - `RH_SMTP_FROM_NAME` : nom d'affichage de l'expediteur.
 - `RH_SMTP_ADMIN_RECIPIENTS` : liste de destinataires admin (separes par des virgules) prevenus des nouvelles saisies a valider.
 
+## Alerte "nouvel arrivant a saisir"
+
+Tache de fond qui sonde les demandes GLPI "Inscription nouvel arrivant" (memes donnees que l'onglet *Saisie arrivants* : arrivee a venir, pas encore importees) et envoie un email avec un lien vers `/admin?section=saisie`. Necessite `RH_DATA_SOURCE=mysql`, un compte GLPI configure (`RH_GLPI_*`) et le SMTP actif (`RH_SMTP_*`).
+
+- `RH_ARRIVAL_NOTIFY_ENABLED` : active la tache (`false` par defaut).
+- `RH_ARRIVAL_NOTIFY_RECIPIENTS` : destinataires de l'alerte, separes par des virgules (ex. `h.el-mouman@iecb.u-bordeaux.fr`). Si vide, rien n'est envoye.
+- `RH_ARRIVAL_NOTIFY_INTERVAL_MS` : frequence de sondage, par defaut `1800000` (30 min).
+- `RH_ARRIVAL_NOTIFY_BASE_URL` : URL de base utilisee dans le lien du mail, par defaut `http://rh-direction-app.local.iecb.u-bordeaux.fr`.
+- `RH_ARRIVAL_NOTIFY_STORE_PATH` : fichier JSON de deduplication (identifiants `glpi_formanswer_id` deja notifies), par defaut `server/data/arrival-notify.store.json` (ignore par Git).
+
 ## Vues SQL attendues
 
 - `vw_rh_effectif` : `nom`, `prenom`, `categorie`, `fonction`, `entite`, `badge`, `statut_badge`, `civilite`

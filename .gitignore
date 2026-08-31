@@ -8,6 +8,7 @@ dist/
 server/data/users.store.json
 server/data/awareness-campaigns.store.json
 server/data/awareness-outbox.store.json
+server/data/arrival-notify.store.json
 .codex
 .agents/
 AGENTS.md

@@ -203,5 +203,25 @@ export const appConfig = {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
+  },
+  // Alerte "nouvel arrivant a saisir" : l'appli sonde les demandes GLPI
+  // "Inscription nouvel arrivant" et previent par email (avec lien vers l'onglet
+  // de saisie) la ou les personnes chargees de la saisie. Necessite MySQL + un
+  // compte GLPI configure (RH_GLPI_*) et SMTP actif (RH_SMTP_*).
+  arrivalNotify: {
+    enabled: readBoolean("RH_ARRIVAL_NOTIFY_ENABLED", false),
+    intervalMs: readNumber("RH_ARRIVAL_NOTIFY_INTERVAL_MS", 30 * 60 * 1000),
+    storePath: readString(
+      "RH_ARRIVAL_NOTIFY_STORE_PATH",
+      "server/data/arrival-notify.store.json"
+    ),
+    baseUrl: readString(
+      "RH_ARRIVAL_NOTIFY_BASE_URL",
+      "http://rh-direction-app.local.iecb.u-bordeaux.fr"
+    ),
+    recipients: readString("RH_ARRIVAL_NOTIFY_RECIPIENTS", "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
   }
 };

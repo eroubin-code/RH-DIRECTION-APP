@@ -15,6 +15,7 @@ import {
   markPendingPersonnelValidated
 } from "./data/index.js";
 import { sendMail } from "./mailer.js";
+import { runArrivalNotifierCheck } from "./arrivalNotifier.js";
 import {
   createUser,
   hashPassword,
@@ -1529,4 +1530,25 @@ if (appConfig.awareness.enabled) {
   }, appConfig.awareness.cleanupIntervalMs);
 
   awarenessCleanupTimer.unref?.();
+}
+
+if (appConfig.arrivalNotify.enabled) {
+  const runArrivalCheck = () => {
+    runArrivalNotifierCheck()
+      .then((result) => {
+        if (result.sent > 0) {
+          console.log(`[arrival-notify] ${result.sent} alerte(s) "nouvel arrivant" envoyee(s).`);
+        }
+      })
+      .catch((error) => {
+        console.error(`[arrival-notify] ${error.message}`);
+      });
+  };
+
+  runArrivalCheck();
+  const arrivalNotifierTimer = setInterval(
+    runArrivalCheck,
+    appConfig.arrivalNotify.intervalMs
+  );
+  arrivalNotifierTimer.unref?.();
 }

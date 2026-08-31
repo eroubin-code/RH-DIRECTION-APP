@@ -937,7 +937,7 @@ export default function AdministrationPage({ currentUser }) {
             )}
           </div>
 
-          <div className="admin-layout">
+          <div className={glpiArrivals.length > 0 ? "admin-layout" : "admin-single-panel"}>
           {glpiArrivals.length > 0 ? (
             <div className="admin-glpi-arrivals">
               <div className="admin-form-header">

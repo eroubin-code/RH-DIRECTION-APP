@@ -1145,6 +1145,17 @@
   font-size: 14px;
 }
 
+/* Bloc "Saisies a verifier" en haut de l'onglet "Saisie arrivants". */
+.admin-pending-review {
+  margin-bottom: 28px;
+  border: 1px solid #e5eaf0;
+  border-radius: 16px;
+  background: #fff;
+  padding: 24px;
+  display: grid;
+  gap: 12px;
+}
+
 /* Fenetre de revue d'une saisie en attente (onglet "Saisie arrivants"). */
 .admin-review-overlay {
   position: fixed;

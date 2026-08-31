@@ -227,6 +227,12 @@ export default function AdministrationPage({ currentUser }) {
 
   const isEntryOnlyRole = currentUser?.role === "operateur_saisie";
   const canDecidePending = currentUser?.role === "admin" || currentUser?.role === "operateur";
+  // Liste "à vérifier" en haut de l'onglet : pour un valideur, uniquement les
+  // saisies encore en attente ; pour l'operateur_saisie, ses propres saisies
+  // (deja filtrees cote serveur), tous statuts confondus.
+  const pendingToReview = canDecidePending
+    ? pendingEntries.filter((entry) => entry.statut === "en_attente")
+    : pendingEntries;
   const requestedSection = searchParams.get("section") ?? "utilisateurs";
   const activeSection = ADMIN_SECTIONS.includes(requestedSection)
     ? requestedSection
@@ -904,7 +910,34 @@ export default function AdministrationPage({ currentUser }) {
       ) : null}
 
       {effectiveSection === "saisie" ? (
-        <div className="admin-layout">
+        <>
+          <div className="admin-pending-review">
+            <div className="admin-form-header">
+              <h4>{canDecidePending ? "Saisies à vérifier" : "Mes saisies"}</h4>
+            </div>
+            {pendingToReview.length > 0 ? (
+              <DataTable
+                columns={[
+                  { key: "prenom", label: "Prénom" },
+                  { key: "nom", label: "Nom" }
+                ]}
+                data={pendingToReview}
+                renderRowActions={(row) => (
+                  <button
+                    className="btn-primary admin-submit"
+                    onClick={() => setReviewEntry(row)}
+                    type="button"
+                  >
+                    Vérifier
+                  </button>
+                )}
+              />
+            ) : (
+              <p className="admin-form-hint">Aucune saisie en attente de vérification.</p>
+            )}
+          </div>
+
+          <div className="admin-layout">
           {glpiArrivals.length > 0 ? (
             <div className="admin-glpi-arrivals">
               <div className="admin-form-header">
@@ -1137,38 +1170,6 @@ export default function AdministrationPage({ currentUser }) {
               {isSubmittingPending ? "Envoi..." : "Envoyer pour validation"}
             </button>
           </form>
-
-          <div className="admin-users">
-            <div className="admin-users-list">
-              <div className="admin-form-header">
-                <h4>
-                  {canDecidePending ? "Saisies en attente de validation" : "Mes saisies"}
-                </h4>
-              </div>
-              <DataTable
-                columns={[
-                  { key: "prenom", label: "Prénom" },
-                  { key: "nom", label: "Nom" },
-                  { key: "entite", label: "Entité" },
-                  { key: "fonction", label: "Fonction" },
-                  { key: "statutLabel", label: "Statut" },
-                  { key: "submitted_by_username", label: "Saisi par" }
-                ]}
-                data={pendingEntries.map((entry) => ({
-                  ...entry,
-                  statutLabel: PENDING_STATUS_LABELS[entry.statut] ?? entry.statut
-                }))}
-                renderRowActions={(row) => (
-                  <button
-                    className="btn-primary admin-submit"
-                    onClick={() => setReviewEntry(row)}
-                    type="button"
-                  >
-                    Examiner
-                  </button>
-                )}
-              />
-            </div>
           </div>
 
           {reviewEntry ? (
@@ -1189,7 +1190,7 @@ export default function AdministrationPage({ currentUser }) {
               rejectComment={rejectComments[reviewEntry.id] ?? ""}
             />
           ) : null}
-        </div>
+        </>
       ) : null}
 
       {effectiveSection === "batiments" ? (

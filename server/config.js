@@ -238,5 +238,11 @@ export const appConfig = {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
+  },
+  // A la validation d'une saisie issue de GLPI, accuse reception au demandeur
+  // (createur de la demande GLPI). Necessite que rh_glpi_reader puisse lire
+  // glpi_users / glpi_useremails.
+  arrivalConfirm: {
+    enabled: readBoolean("RH_ARRIVAL_CONFIRM_ENABLED", false)
   }
 };

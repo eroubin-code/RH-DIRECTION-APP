@@ -174,6 +174,40 @@ export async function getGlpiNewArrivalSubmissions() {
   );
 }
 
+// Demandeur (createur) d'une demande GLPI "Inscription nouvel arrivant" :
+// { email, name } ou {} si introuvable / droits insuffisants (le compte
+// rh_glpi_reader doit avoir SELECT sur glpi_users et glpi_useremails).
+export async function getGlpiRequesterContact(formanswerId) {
+  if (!formanswerId || !appConfig.glpi.user || appConfig.dataSource.mode !== "mysql") {
+    return {};
+  }
+
+  try {
+    const currentPool = await getGlpiPool();
+    const [rows] = await currentPool.query(
+      [
+        "SELECT ue.email AS email,",
+        "  TRIM(CONCAT(COALESCE(u.firstname, ''), ' ', COALESCE(u.realname, u.name))) AS name",
+        "FROM glpi_plugin_formcreator_formanswers fa",
+        "JOIN glpi_users u ON u.id = fa.requester_id",
+        "LEFT JOIN glpi_useremails ue ON ue.users_id = u.id AND ue.is_default = 1",
+        "WHERE fa.id = ? LIMIT 1"
+      ].join(" "),
+      [formanswerId]
+    );
+
+    const row = rows[0];
+    if (!row || !String(row.email ?? "").trim()) {
+      return {};
+    }
+
+    return { email: String(row.email).trim(), name: String(row.name ?? "").trim() };
+  } catch (error) {
+    console.warn(`[glpi] Demandeur #${formanswerId} non resolu : ${error.message}`);
+    return {};
+  }
+}
+
 function normalizeSnapshotDate(value) {
   const normalizedValue = String(value ?? "").trim();
 

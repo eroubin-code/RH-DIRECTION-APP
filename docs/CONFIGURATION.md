@@ -149,7 +149,13 @@ A la validation d'une saisie arrivant, l'appli genere la "Fiche d'arrivee" pre-r
 - `RH_FICHE_ARRIVEE_TEMPLATE` : chemin du PDF modele (non fourni par le depot), par defaut `server/assets/fiche-arrivee-modele.pdf`. Les pages annexes du modele sont conservees telles quelles.
 - `RH_FICHE_ARRIVEE_RECIPIENTS` : destinataires (separes par des virgules). Si vide, rien n'est envoye.
 
-Les positions des champs sont definies dans `server/ficheArrivee.js` (objet `LAYOUT`, coordonnees en pixels sur un rendu large de 950 px, origine haut-gauche) — a ajuster apres un premier rendu reel.
+Les positions des champs (mode superposition) sont dans `server/ficheArrivee.js` (`OVERLAY_LAYOUT`). Sans modele, une fiche "maison" 2 pages est composee (polices Liberation dans `server/assets/fonts/`).
+
+## Accuse de reception au demandeur GLPI
+
+- `RH_ARRIVAL_CONFIRM_ENABLED` : a la validation d'une saisie issue de GLPI, envoie un accuse de reception au demandeur (createur de la demande GLPI). `false` par defaut.
+
+Necessite que le compte `RH_GLPI_MYSQL_USER` ait `SELECT` sur `glpi_users` (colonnes `id, name, realname, firstname`) et `glpi_useremails` (`users_id, email, is_default`). Sans ce droit, la validation se deroule normalement, l'accuse est simplement journalise comme non resolu.
 
 ## Vues SQL attendues
 

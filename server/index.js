@@ -7,6 +7,7 @@ import {
   getAnnualSnapshotReport,
   getDataStatus,
   getGlpiNewArrivalSubmissions,
+  getGlpiRequesterContact,
   getPendingPersonnel,
   getPendingPersonnelById,
   getPersonneLabel,
@@ -936,6 +937,47 @@ async function sendFicheArrivee(pending) {
   });
 }
 
+// Accuse de reception au demandeur de la demande GLPI, apres validation.
+async function confirmToGlpiRequester(pending, userid) {
+  const contact = await getGlpiRequesterContact(pending.glpi_formanswer_id);
+
+  if (!contact.email) {
+    console.warn(
+      `[arrival-confirm] Demande GLPI #${pending.glpi_formanswer_id} : demandeur sans email, pas d'accuse.`
+    );
+    return;
+  }
+
+  const nom = `${pending.prenom ?? ""} ${pending.nom ?? ""}`.trim();
+  const equipe = String(pending.entite ?? "").trim();
+
+  const details = [
+    `  Nom     : ${pending.nom || "-"}`,
+    `  Prenom  : ${pending.prenom || "-"}`,
+    `  Equipe  : ${equipe || "-"}`,
+    `  Arrivee : ${pending.arrivee || "-"}`
+  ];
+  if (userid) {
+    details.push(`  Identifiant cree : ${userid}`);
+  }
+
+  await sendMail({
+    to: contact.email,
+    subject: `Inscription nouvel arrivant traitee - ${nom}${equipe ? ` (${equipe})` : ""}`,
+    text: [
+      `Bonjour${contact.name ? ` ${contact.name}` : ""},`,
+      "",
+      "La demande d'inscription du nouvel arrivant que vous avez declaree via GLPI",
+      "a ete saisie et validee dans RH Direction App.",
+      "",
+      ...details,
+      "",
+      "Cordialement,",
+      "RH Direction App"
+    ].join("\n")
+  });
+}
+
 app.post(
   "/api/personnel/pending/:id/validate",
   requireAuth,
@@ -984,6 +1026,13 @@ app.post(
       ) {
         sendFicheArrivee(pending).catch((error) => {
           console.error(`[fiche-arrivee] ${error.message}`);
+        });
+      }
+
+      // Accuse de reception au demandeur GLPI (non bloquant).
+      if (appConfig.arrivalConfirm.enabled && pending.glpi_formanswer_id) {
+        confirmToGlpiRequester(pending, personnel.userid).catch((error) => {
+          console.error(`[arrival-confirm] ${error.message}`);
         });
       }
 

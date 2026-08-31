@@ -223,5 +223,20 @@ export const appConfig = {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
+  },
+  // A la validation d'une saisie arrivant, genere la "Fiche d'arrivee" pre-remplie
+  // (superposition des valeurs sur un PDF modele) et l'envoie par email. Le modele
+  // n'est pas fourni par ce depot : deposer le PDF a RH_FICHE_ARRIVEE_TEMPLATE.
+  // Sans modele ou si desactive, la validation se deroule normalement sans PDF.
+  ficheArrivee: {
+    enabled: readBoolean("RH_FICHE_ARRIVEE_ENABLED", false),
+    templatePath: readString(
+      "RH_FICHE_ARRIVEE_TEMPLATE",
+      "server/assets/fiche-arrivee-modele.pdf"
+    ),
+    recipients: readString("RH_FICHE_ARRIVEE_RECIPIENTS", "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
   }
 };

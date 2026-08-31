@@ -9,6 +9,7 @@ import {
   getGlpiNewArrivalSubmissions,
   getPendingPersonnel,
   getPendingPersonnelById,
+  getPersonneLabel,
   getPersonnelTypes,
   getRhDataset,
   markPendingPersonnelRejected,
@@ -16,6 +17,7 @@ import {
 } from "./data/index.js";
 import { sendMail } from "./mailer.js";
 import { runArrivalNotifierCheck } from "./arrivalNotifier.js";
+import { buildFicheArriveePdf } from "./ficheArrivee.js";
 import {
   createUser,
   hashPassword,
@@ -884,6 +886,55 @@ app.get(
   }
 );
 
+// Genere la Fiche d'arrivee pre-remplie a partir d'une saisie validee et
+// l'envoie par email. Silencieux si le modele PDF est absent.
+async function sendFicheArrivee(pending) {
+  const chefDeGroupe = await getPersonneLabel(pending.contact_personne_id);
+  const pdf = await buildFicheArriveePdf({
+    civilite: pending.civilite,
+    nom: pending.nom,
+    prenom: pending.prenom,
+    naissance: pending.naissance,
+    permanent: !pending.depart,
+    arrivee: pending.arrivee,
+    depart: pending.depart,
+    fonction: pending.fonction,
+    typePersonne: pending.type_personne,
+    tutelle: pending.tutelle,
+    entite: pending.entite,
+    badgeDemande: Boolean(pending.badge_demande),
+    numeroBadge: pending.numero_badge,
+    chefDeGroupe
+  });
+
+  if (!pdf) {
+    return;
+  }
+
+  const nom = `${pending.prenom ?? ""} ${pending.nom ?? ""}`.trim();
+  const slug =
+    `${pending.nom ?? ""}-${pending.prenom ?? ""}`
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "arrivant";
+
+  await sendMail({
+    to: appConfig.ficheArrivee.recipients,
+    subject: `Fiche d'arrivee - ${nom}`,
+    text: [
+      `La saisie de ${nom} a ete validee dans RH Direction App.`,
+      "",
+      "Fiche d'arrivee pre-remplie en piece jointe : a completer (adresse,",
+      "telephone, pieces/cles, signatures du circuit) puis a faire circuler."
+    ].join("\n"),
+    attachments: [
+      { filename: `fiche-arrivee-${slug}.pdf`, content: pdf, contentType: "application/pdf" }
+    ]
+  });
+}
+
 app.post(
   "/api/personnel/pending/:id/validate",
   requireAuth,
@@ -924,6 +975,16 @@ app.post(
         decidedBy: request.user.username,
         createdPersonneId: personnel.id
       });
+
+      // Fiche d'arrivee pre-remplie envoyee par email (non bloquant).
+      if (
+        appConfig.ficheArrivee.enabled &&
+        appConfig.ficheArrivee.recipients.length > 0
+      ) {
+        sendFicheArrivee(pending).catch((error) => {
+          console.error(`[fiche-arrivee] ${error.message}`);
+        });
+      }
 
       response.json({ id: pending.id, statut: "validee", personnelId: personnel.id });
     } catch (error) {

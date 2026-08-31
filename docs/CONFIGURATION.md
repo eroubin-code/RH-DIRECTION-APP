@@ -141,6 +141,16 @@ Tache de fond qui sonde les demandes GLPI "Inscription nouvel arrivant" (memes d
 - `RH_ARRIVAL_NOTIFY_BASE_URL` : URL de base utilisee dans le lien du mail, par defaut `http://rh-direction-app.local.iecb.u-bordeaux.fr`.
 - `RH_ARRIVAL_NOTIFY_STORE_PATH` : fichier JSON de deduplication (identifiants `glpi_formanswer_id` deja notifies), par defaut `server/data/arrival-notify.store.json` (ignore par Git).
 
+## Fiche d'arrivee (PDF a la validation)
+
+A la validation d'une saisie arrivant, l'appli genere la "Fiche d'arrivee" pre-remplie en superposant les valeurs de la personne sur un PDF modele, puis l'envoie en piece jointe. Non bloquant : si le modele est absent ou la fonctionnalite desactivee, la validation se deroule sans PDF.
+
+- `RH_FICHE_ARRIVEE_ENABLED` : active l'envoi (`false` par defaut).
+- `RH_FICHE_ARRIVEE_TEMPLATE` : chemin du PDF modele (non fourni par le depot), par defaut `server/assets/fiche-arrivee-modele.pdf`. Les pages annexes du modele sont conservees telles quelles.
+- `RH_FICHE_ARRIVEE_RECIPIENTS` : destinataires (separes par des virgules). Si vide, rien n'est envoye.
+
+Les positions des champs sont definies dans `server/ficheArrivee.js` (objet `LAYOUT`, coordonnees en pixels sur un rendu large de 950 px, origine haut-gauche) — a ajuster apres un premier rendu reel.
+
 ## Vues SQL attendues
 
 - `vw_rh_effectif` : `nom`, `prenom`, `categorie`, `fonction`, `entite`, `badge`, `statut_badge`, `civilite`

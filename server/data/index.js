@@ -575,6 +575,25 @@ export async function getPendingPersonnelById(id) {
   return rows[0] ?? null;
 }
 
+// Libelle "NOM Prenom" d'une personne de la base RH, pour affichage (ex. chef de
+// groupe / contact sur la fiche d'arrivee). Chaine vide si introuvable ou hors MySQL.
+export async function getPersonneLabel(id) {
+  if (!id || appConfig.dataSource.mode !== "mysql") {
+    return "";
+  }
+
+  const rows = await queryRows(
+    "SELECT nom, prenom FROM personnes WHERE id = ? LIMIT 1",
+    [id]
+  );
+
+  if (!rows[0]) {
+    return "";
+  }
+
+  return `${String(rows[0].nom ?? "").trim()} ${String(rows[0].prenom ?? "").trim()}`.trim();
+}
+
 export async function markPendingPersonnelValidated(id, { decidedBy, createdPersonneId }) {
   if (appConfig.dataSource.mode !== "mysql") {
     throw new Error("La saisie de personnel necessite la base MySQL.");

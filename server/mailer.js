@@ -22,7 +22,7 @@ function getTransporter() {
   return cachedTransporter;
 }
 
-export async function sendMail({ to, subject, text, html }) {
+export async function sendMail({ to, subject, text, html, attachments }) {
   const recipients = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
 
   if (recipients.length === 0) {
@@ -43,7 +43,8 @@ export async function sendMail({ to, subject, text, html }) {
     to: recipients.join(", "),
     subject,
     text,
-    html
+    html,
+    ...(Array.isArray(attachments) && attachments.length > 0 ? { attachments } : {})
   });
 
   return { sent: true };

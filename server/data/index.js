@@ -187,6 +187,7 @@ export async function getGlpiRequesterContact(formanswerId) {
     const [rows] = await currentPool.query(
       [
         "SELECT ue.email AS email,",
+        "  COALESCE(NULLIF(TRIM(u.firstname), ''), u.name) AS first_name,",
         "  TRIM(CONCAT(COALESCE(u.firstname, ''), ' ', COALESCE(u.realname, u.name))) AS name",
         "FROM glpi_plugin_formcreator_formanswers fa",
         "JOIN glpi_users u ON u.id = fa.requester_id",
@@ -201,7 +202,11 @@ export async function getGlpiRequesterContact(formanswerId) {
       return {};
     }
 
-    return { email: String(row.email).trim(), name: String(row.name ?? "").trim() };
+    return {
+      email: String(row.email).trim(),
+      firstName: String(row.first_name ?? "").trim(),
+      name: String(row.name ?? "").trim()
+    };
   } catch (error) {
     console.warn(`[glpi] Demandeur #${formanswerId} non resolu : ${error.message}`);
     return {};

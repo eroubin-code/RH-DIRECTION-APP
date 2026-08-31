@@ -938,7 +938,7 @@ async function sendFicheArrivee(pending) {
 }
 
 // Accuse de reception au demandeur de la demande GLPI, apres validation.
-async function confirmToGlpiRequester(pending, userid) {
+async function confirmToGlpiRequester(pending) {
   const contact = await getGlpiRequesterContact(pending.glpi_formanswer_id);
 
   if (!contact.email) {
@@ -950,30 +950,19 @@ async function confirmToGlpiRequester(pending, userid) {
 
   const nom = `${pending.prenom ?? ""} ${pending.nom ?? ""}`.trim();
   const equipe = String(pending.entite ?? "").trim();
-
-  const details = [
-    `  Nom     : ${pending.nom || "-"}`,
-    `  Prenom  : ${pending.prenom || "-"}`,
-    `  Equipe  : ${equipe || "-"}`,
-    `  Arrivee : ${pending.arrivee || "-"}`
-  ];
-  if (userid) {
-    details.push(`  Identifiant cree : ${userid}`);
-  }
+  const arrivant = `${pending.prenom ?? ""} ${pending.nom ?? ""}`.trim() || "l'arrivant";
 
   await sendMail({
     to: contact.email,
     subject: `Inscription nouvel arrivant traitee - ${nom}${equipe ? ` (${equipe})` : ""}`,
     text: [
-      `Bonjour${contact.name ? ` ${contact.name}` : ""},`,
+      `Bonjour${contact.firstName ? ` ${contact.firstName}` : ""},`,
       "",
-      "La demande d'inscription du nouvel arrivant que vous avez declaree via GLPI",
-      "a ete saisie et validee dans RH Direction App.",
+      `Votre fiche d'arrivée de ${arrivant} a été créée.`,
+      "Merci de bien vouloir la récupérer à l'accueil.",
       "",
-      ...details,
-      "",
-      "Cordialement,",
-      "RH Direction App"
+      "Cordialement.",
+      "Le service des ressources informatiques"
     ].join("\n")
   });
 }
@@ -1031,7 +1020,7 @@ app.post(
 
       // Accuse de reception au demandeur GLPI (non bloquant).
       if (appConfig.arrivalConfirm.enabled && pending.glpi_formanswer_id) {
-        confirmToGlpiRequester(pending, personnel.userid).catch((error) => {
+        confirmToGlpiRequester(pending).catch((error) => {
           console.error(`[arrival-confirm] ${error.message}`);
         });
       }
